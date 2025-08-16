@@ -4,10 +4,6 @@ import type React from "react"
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   Dialog,
   DialogContent,
@@ -17,145 +13,155 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Plus, Upload, X } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { CalendarIcon, Plus, Package } from "lucide-react"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
+import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 import type { Item, AppSettings } from "@/app/page"
 
 interface AddItemFormProps {
-  onAddItem: (item: Omit<Item, "id">) => void
+  onAddItem: (item: Omit<Item, "id">) => Promise<void>
   settings: AppSettings
+  defaultType?: "herramienta" | "insumo"
 }
 
-export default function AddItemForm({ onAddItem, settings }: AddItemFormProps) {
+export default function AddItemForm({ onAddItem, settings, defaultType }: AddItemFormProps) {
   const [open, setOpen] = useState(false)
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
-  const [formData, setFormData] = useState({
-    name: "",
-    category: "",
-    quantity: "",
-    source: "",
-    cost: "",
-    acquisitionDate: new Date().toISOString().split("T")[0],
-    description: "",
-    type: "herramienta" as "herramienta" | "insumo",
-    image: "",
-    brand: "",
-    condition: "nuevo" as "nuevo" | "usado" | "regular" | "malo",
-    location: "",
-  })
+  const [name, setName] = useState("")
+  const [category, setCategory] = useState("")
+  const [quantity, setQuantity] = useState("")
+  const [source, setSource] = useState("")
+  const [cost, setCost] = useState("")
+  const [acquisitionDate, setAcquisitionDate] = useState<Date>(new Date())
+  const [description, setDescription] = useState("")
+  const [type, setType] = useState<"herramienta" | "insumo">(defaultType || "herramienta")
+  const [brand, setBrand] = useState("")
+  const [condition, setCondition] = useState<"nuevo" | "usado" | "regular" | "malo">("nuevo")
+  const [location, setLocation] = useState("")
+  const [loading, setLoading] = useState(false)
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const result = e.target?.result as string
-        setImagePreview(result)
-        setFormData((prev) => ({ ...prev, image: result }))
-      }
-      reader.readAsDataURL(file)
-    }
-  }
-
-  const removeImage = () => {
-    setImagePreview(null)
-    setFormData((prev) => ({ ...prev, image: "" }))
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    const quantity = Number.parseInt(formData.quantity)
-    let status: "active" | "low-stock" | "out-of-stock" = "active"
-
-    if (quantity === 0) status = "out-of-stock"
-    else if (quantity < settings.lowStockThreshold) status = "low-stock"
-
-    const newItem: Omit<Item, "id"> = {
-      name: formData.name,
-      category: formData.category,
-      quantity,
-      source: formData.source,
-      cost: formData.cost ? Number.parseFloat(formData.cost) : undefined,
-      acquisitionDate: formData.acquisitionDate,
-      description: formData.description || undefined,
-      status,
-      type: formData.type,
-      image: formData.image || undefined,
-      brand: formData.brand || undefined,
-      condition: formData.condition,
-      location: formData.location || undefined,
+    if (!name.trim()) {
+      toast.error("El nombre es requerido")
+      return
     }
 
-    onAddItem(newItem)
-    setOpen(false)
-    setFormData({
-      name: "",
-      category: "",
-      quantity: "",
-      source: "",
-      cost: "",
-      acquisitionDate: new Date().toISOString().split("T")[0],
-      description: "",
-      type: "herramienta",
-      image: "",
-      brand: "",
-      condition: "nuevo",
-      location: "",
-    })
-    setImagePreview(null)
+    if (!category) {
+      toast.error("Selecciona una categoría")
+      return
+    }
+
+    if (!source) {
+      toast.error("Selecciona una fuente")
+      return
+    }
+
+    const quantityNum = Number.parseInt(quantity)
+    if (isNaN(quantityNum) || quantityNum < 0) {
+      toast.error("La cantidad debe ser un número válido")
+      return
+    }
+
+    const costNum = cost ? Number.parseFloat(cost) : undefined
+    if (cost && (isNaN(costNum!) || costNum! < 0)) {
+      toast.error("El costo debe ser un número válido")
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      // Determinar el estado basado en la cantidad y tipo
+      let status: "active" | "low-stock" | "out-of-stock" = "active"
+      if (quantityNum === 0) {
+        status = "out-of-stock"
+      } else if (quantityNum < settings.lowStockThreshold && type === "insumo") {
+        status = "low-stock"
+      }
+
+      const newItem: Omit<Item, "id"> = {
+        name: name.trim(),
+        category,
+        quantity: quantityNum,
+        source,
+        cost: costNum,
+        acquisitionDate: format(acquisitionDate, "yyyy-MM-dd"),
+        description: description.trim() || undefined,
+        status,
+        type,
+        brand: brand.trim() || undefined,
+        condition,
+        location: location.trim() || undefined,
+      }
+
+      await onAddItem(newItem)
+
+      // Reset form
+      setName("")
+      setCategory("")
+      setQuantity("")
+      setSource("")
+      setCost("")
+      setAcquisitionDate(new Date())
+      setDescription("")
+      setType(defaultType || "herramienta")
+      setBrand("")
+      setCondition("nuevo")
+      setLocation("")
+      setOpen(false)
+
+      toast.success("Artículo agregado correctamente")
+    } catch (error) {
+      console.error("Error adding item:", error)
+      toast.error("Error al agregar el artículo")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Agregar Artículo
+        <Button className="gap-2">
+          <Plus className="h-4 w-4" />
+          Agregar {defaultType === "insumo" ? "Insumo" : defaultType === "herramienta" ? "Herramienta" : "Artículo"}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Agregar Nuevo Artículo</DialogTitle>
-          <DialogDescription>Registrar un nuevo artículo en el inventario del pañol.</DialogDescription>
+          <DialogTitle className="flex items-center gap-2">
+            <Package className="h-5 w-5" />
+            Agregar Nuevo Artículo
+          </DialogTitle>
+          <DialogDescription>Completa la información del artículo para agregarlo al inventario.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Nombre del Artículo *</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-              placeholder="ej. Calculadora Científica"
-              required
-            />
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="category">Categoría *</Label>
-              <Select
-                value={formData.category}
-                onValueChange={(value) => setFormData((prev) => ({ ...prev, category: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar categoría" />
-                </SelectTrigger>
-                <SelectContent>
-                  {settings.categories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Información básica */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="name">Nombre *</Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Nombre del artículo"
+                required
+              />
             </div>
 
-            <div className="space-y-2">
+            <div>
               <Label htmlFor="type">Tipo *</Label>
-              <Select
-                value={formData.type}
-                onValueChange={(value: "herramienta" | "insumo") => setFormData((prev) => ({ ...prev, type: value }))}
-              >
+              <Select value={type} onValueChange={(value) => setType(value as "herramienta" | "insumo")} required>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -167,25 +173,82 @@ export default function AddItemForm({ onAddItem, settings }: AddItemFormProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="category">Categoría *</Label>
+              <Select value={category} onValueChange={setCategory} required>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona categoría" />
+                </SelectTrigger>
+                <SelectContent>
+                  {settings.categories.map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="quantity">Cantidad *</Label>
+              <Input
+                id="quantity"
+                type="number"
+                min="0"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                placeholder="0"
+                required
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="source">Fuente *</Label>
+              <Select value={source} onValueChange={setSource} required>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona fuente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {settings.sources.map((src) => (
+                    <SelectItem key={src} value={src}>
+                      {src}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="cost">Costo</Label>
+              <Input
+                id="cost"
+                type="number"
+                min="0"
+                step="0.01"
+                value={cost}
+                onChange={(e) => setCost(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
               <Label htmlFor="brand">Marca</Label>
               <Input
                 id="brand"
-                value={formData.brand}
-                onChange={(e) => setFormData((prev) => ({ ...prev, brand: e.target.value }))}
-                placeholder="ej. Samsung, HP, Faber-Castell"
+                value={brand}
+                onChange={(e) => setBrand(e.target.value)}
+                placeholder="Marca del artículo"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="condition">Estado *</Label>
-              <Select
-                value={formData.condition}
-                onValueChange={(value: "nuevo" | "usado" | "regular" | "malo") =>
-                  setFormData((prev) => ({ ...prev, condition: value }))
-                }
-              >
+            <div>
+              <Label htmlFor="condition">Condición *</Label>
+              <Select value={condition} onValueChange={(value) => setCondition(value as any)} required>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -199,134 +262,58 @@ export default function AddItemForm({ onAddItem, settings }: AddItemFormProps) {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="location">Ubicación</Label>
-            <Select
-              value={formData.location}
-              onValueChange={(value) => setFormData((prev) => ({ ...prev, location: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Seleccionar ubicación" />
-              </SelectTrigger>
-              <SelectContent>
-                {settings.locations.map((location) => (
-                  <SelectItem key={location} value={location}>
-                    {location}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="quantity">Cantidad *</Label>
-              <Input
-                id="quantity"
-                type="number"
-                min="0"
-                value={formData.quantity}
-                onChange={(e) => setFormData((prev) => ({ ...prev, quantity: e.target.value }))}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="source">Origen *</Label>
-              <Select
-                value={formData.source}
-                onValueChange={(value) => setFormData((prev) => ({ ...prev, source: value }))}
-              >
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="location">Ubicación</Label>
+              <Select value={location} onValueChange={setLocation}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar origen" />
+                  <SelectValue placeholder="Selecciona ubicación" />
                 </SelectTrigger>
                 <SelectContent>
-                  {settings.sources.map((source) => (
-                    <SelectItem key={source} value={source}>
-                      {source}
+                  {settings.locations.map((loc) => (
+                    <SelectItem key={loc} value={loc}>
+                      {loc}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="cost">Costo por Unidad</Label>
-              <Input
-                id="cost"
-                type="number"
-                step="0.01"
-                min="0"
-                value={formData.cost}
-                onChange={(e) => setFormData((prev) => ({ ...prev, cost: e.target.value }))}
-                placeholder="0.00"
-                disabled={formData.source === "DONACIONES"}
-              />
+            <div>
+              <Label>Fecha de adquisición *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !acquisitionDate && "text-muted-foreground",
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {acquisitionDate ? format(acquisitionDate, "PPP", { locale: es }) : "Selecciona fecha"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={acquisitionDate}
+                    onSelect={(date) => date && setAcquisitionDate(date)}
+                    disabled={(date) => date > new Date()}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="acquisitionDate">Fecha de Adquisición *</Label>
-              <Input
-                id="acquisitionDate"
-                type="date"
-                value={formData.acquisitionDate}
-                onChange={(e) => setFormData((prev) => ({ ...prev, acquisitionDate: e.target.value }))}
-                required
-              />
-            </div>
           </div>
 
-          {/* Image Upload */}
-          <div className="space-y-2">
-            <Label htmlFor="image">Imagen del Artículo</Label>
-            {imagePreview ? (
-              <div className="relative">
-                <img
-                  src={imagePreview || "/placeholder.svg"}
-                  alt="Preview"
-                  className="w-full h-32 object-cover rounded-lg border"
-                />
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  className="absolute top-2 right-2"
-                  onClick={removeImage}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-            ) : (
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
-                <div className="text-center">
-                  <Upload className="mx-auto h-8 w-8 text-gray-400" />
-                  <div className="mt-2">
-                    <label htmlFor="image-upload" className="cursor-pointer">
-                      <span className="text-sm text-blue-600 hover:text-blue-500">Subir imagen</span>
-                      <input
-                        id="image-upload"
-                        type="file"
-                        className="hidden"
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                      />
-                    </label>
-                  </div>
-                  <p className="text-xs text-gray-500">PNG, JPG hasta 10MB</p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
+          <div>
             <Label htmlFor="description">Descripción</Label>
             <Textarea
               id="description"
-              value={formData.description}
-              onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-              placeholder="Detalles adicionales sobre el artículo..."
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Descripción detallada del artículo..."
               rows={3}
             />
           </div>
@@ -335,8 +322,9 @@ export default function AddItemForm({ onAddItem, settings }: AddItemFormProps) {
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={!formData.name || !formData.category}>
-              Agregar Artículo
+            <Button type="submit" disabled={loading} className="gap-2">
+              <Package className="h-4 w-4" />
+              {loading ? "Agregando..." : "Agregar Artículo"}
             </Button>
           </DialogFooter>
         </form>

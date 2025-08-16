@@ -1,9 +1,31 @@
 "use client"
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Download, TrendingUp, TrendingDown, DollarSign, Package } from "lucide-react"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+} from "recharts"
+import { FileText, Download, CalendarIcon, TrendingUp, Package, Users, AlertTriangle, Wrench } from "lucide-react"
+import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO } from "date-fns"
+import { es } from "date-fns/locale"
+import { toast } from "sonner"
 import type { Item, Transaction, Disposal } from "@/app/page"
 
 interface ReportsSectionProps {
@@ -12,317 +34,519 @@ interface ReportsSectionProps {
   disposals: Disposal[]
 }
 
+const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8", "#82CA9D"]
+
 export default function ReportsSection({ items, transactions, disposals }: ReportsSectionProps) {
-  // Calculate statistics
-  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0)
-  const totalValue = items.reduce((sum, item) => sum + (item.cost || 0) * item.quantity, 0)
-  const donatedItems = items.filter((item) => item.source === "DONACIONES").length
-  const purchasedItems = items.filter((item) => item.source !== "DONACIONES").length
+  const [reportType, setReportType] = useState("overview")
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
+  })
+  const [selectedCategory, setSelectedCategory] = useState("all")
 
-  const activeLoans = transactions.filter((t) => t.status === "active" && t.type === "loan")
-  const totalLoaned = activeLoans.reduce((sum, t) => sum + t.quantity, 0)
+  // Filtrar datos por rango de fechas
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((transaction) => {
+      const transactionDate = parseISO(transaction.date)
+      return isWithinInterval(transactionDate, dateRange)
+    })
+  }, [transactions, dateRange])
 
-  const totalDisposed = disposals.reduce((sum, d) => sum + d.quantity, 0)
-  const disposalReasons = disposals.reduce(
-    (acc, d) => {
-      const reasonText = getReasonText(d.reason)
-      acc[reasonText] = (acc[reasonText] || 0) + d.quantity
-      return acc
-    },
-    {} as Record<string, number>,
-  )
+  const filteredDisposals = useMemo(() => {
+    return disposals.filter((disposal) => {
+      const disposalDate = parseISO(disposal.date)
+      return isWithinInterval(disposalDate, dateRange)
+    })
+  }, [disposals, dateRange])
 
-  // Category breakdown
-  const categoryStats = items.reduce(
-    (acc, item) => {
-      if (!acc[item.category]) {
-        acc[item.category] = { count: 0, value: 0 }
-      }
-      acc[item.category].count += item.quantity
-      acc[item.category].value += (item.cost || 0) * item.quantity
-      return acc
-    },
-    {} as Record<string, { count: number; value: number }>,
-  )
-
-  // Recent activity
-  const recentTransactions = transactions
-    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-    .slice(0, 5)
-
-  const recentDisposals = disposals.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5)
-
-  function getReasonText(reason: string) {
-    switch (reason) {
-      case "damaged":
-        return "Dañado"
-      case "expired":
-        return "Vencido"
-      case "worn-out":
-        return "Desgastado"
-      case "obsolete":
-        return "Obsoleto"
-      case "other":
-        return "Otro"
-      default:
-        return reason
-    }
-  }
-
-  const exportReport = () => {
-    // Crear datos del reporte
-    const reportData = {
-      fecha: new Date().toLocaleDateString(),
-      resumen: {
-        totalArticulos: totalItems,
-        valorTotal: totalValue,
-        articulosDonados: donatedItems,
-        articulosComprados: purchasedItems,
-        prestamosActivos: activeLoans.length,
-        totalPrestado: totalLoaned,
-        totalDadosDeBaja: totalDisposed,
+  // Datos para gráficos
+  const categoryData = useMemo(() => {
+    const categoryCount = items.reduce(
+      (acc, item) => {
+        acc[item.category] = (acc[item.category] || 0) + item.quantity
+        return acc
       },
-      categorias: categoryStats,
-      razonesDesBaja: disposalReasons,
-      transaccionesRecientes: recentTransactions.map((t) => ({
-        articulo: t.itemName,
-        profesor: t.teacherName,
-        cantidad: t.quantity,
-        tipo: t.type === "loan" ? "Préstamo" : "Donación",
-        fecha: new Date(t.date).toLocaleDateString(),
-        estado: t.status === "active" ? "Activo" : t.status === "returned" ? "Devuelto" : "Vencido",
-      })),
-      bajasRecientes: recentDisposals.map((d) => ({
-        articulo: d.itemName,
-        cantidad: d.quantity,
-        razon: getReasonText(d.reason),
-        fecha: new Date(d.date).toLocaleDateString(),
-        notas: d.notes || "",
-      })),
+      {} as Record<string, number>,
+    )
+
+    return Object.entries(categoryCount).map(([category, count]) => ({
+      category,
+      count,
+    }))
+  }, [items])
+
+  const typeData = useMemo(() => {
+    const herramientas = items
+      .filter((item) => item.type === "herramienta")
+      .reduce((sum, item) => sum + item.quantity, 0)
+    const insumos = items.filter((item) => item.type === "insumo").reduce((sum, item) => sum + item.quantity, 0)
+
+    return [
+      { name: "Herramientas", value: herramientas },
+      { name: "Insumos", value: insumos },
+    ]
+  }, [items])
+
+  const transactionTrends = useMemo(() => {
+    const monthlyData: Record<string, { loans: number; donations: number }> = {}
+
+    filteredTransactions.forEach((transaction) => {
+      const month = format(parseISO(transaction.date), "MMM yyyy", { locale: es })
+      if (!monthlyData[month]) {
+        monthlyData[month] = { loans: 0, donations: 0 }
+      }
+      if (transaction.type === "loan") {
+        monthlyData[month].loans += transaction.quantity
+      } else {
+        monthlyData[month].donations += transaction.quantity
+      }
+    })
+
+    return Object.entries(monthlyData).map(([month, data]) => ({
+      month,
+      préstamos: data.loans,
+      donaciones: data.donations,
+    }))
+  }, [filteredTransactions])
+
+  // Estadísticas generales
+  const stats = useMemo(() => {
+    const totalItems = items.reduce((sum, item) => sum + item.quantity, 0)
+    const totalValue = items.reduce((sum, item) => sum + (item.cost || 0) * item.quantity, 0)
+    const activeLoans = transactions.filter((t) => t.status === "active" && t.type === "loan").length
+    const overdueLoans = transactions.filter((t) => t.status === "overdue").length
+    const lowStockItems = items.filter((item) => item.status === "low-stock").length
+    const outOfStockItems = items.filter((item) => item.status === "out-of-stock").length
+
+    return {
+      totalItems,
+      totalValue,
+      activeLoans,
+      overdueLoans,
+      lowStockItems,
+      outOfStockItems,
+    }
+  }, [items, transactions])
+
+  const exportToCSV = (data: any[], filename: string) => {
+    if (!data.length) {
+      toast.error("No hay datos para exportar")
+      return
     }
 
-    // Convertir a CSV
-    const csvContent = generateCSV(reportData)
+    const headers = Object.keys(data[0]).join(",")
+    const rows = data.map((row) => Object.values(row).join(","))
+    const csvContent = [headers, ...rows].join("\n")
 
-    // Descargar archivo
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
     const link = document.createElement("a")
     const url = URL.createObjectURL(blob)
     link.setAttribute("href", url)
-    link.setAttribute("download", `reporte_inventario_${new Date().toISOString().split("T")[0]}.csv`)
+    link.setAttribute("download", `${filename}.csv`)
     link.style.visibility = "hidden"
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+
+    toast.success("Reporte exportado correctamente")
   }
 
-  const generateCSV = (data: any) => {
-    let csv = "REPORTE DE INVENTARIO - CFP 413\n"
-    csv += `Fecha de generación: ${data.fecha}\n\n`
+  const exportInventoryReport = () => {
+    const reportData = items.map((item) => ({
+      Nombre: item.name,
+      Tipo: item.type,
+      Categoría: item.category,
+      Cantidad: item.quantity,
+      Estado: item.status,
+      Marca: item.brand || "",
+      Condición: item.condition,
+      Ubicación: item.location || "",
+      Costo: item.cost || 0,
+      "Fecha Adquisición": item.acquisitionDate,
+      Fuente: item.source,
+    }))
 
-    // Resumen
-    csv += "RESUMEN GENERAL\n"
-    csv += "Concepto,Valor\n"
-    csv += `Total de Artículos,${data.resumen.totalArticulos}\n`
-    csv += `Valor Total,$${data.resumen.valorTotal.toFixed(2)}\n`
-    csv += `Artículos Donados,${data.resumen.articulosDonados}\n`
-    csv += `Artículos Comprados,${data.resumen.articulosComprados}\n`
-    csv += `Préstamos Activos,${data.resumen.prestamosActivos}\n`
-    csv += `Total Prestado,${data.resumen.totalPrestado}\n`
-    csv += `Total Dados de Baja,${data.resumen.totalDadosDeBaja}\n\n`
+    exportToCSV(reportData, `inventario_${format(new Date(), "yyyy-MM-dd")}`)
+  }
 
-    // Categorías
-    csv += "INVENTARIO POR CATEGORÍA\n"
-    csv += "Categoría,Cantidad,Valor\n"
-    Object.entries(data.categorias).forEach(([category, stats]: [string, any]) => {
-      csv += `${category},${stats.count},$${stats.value.toFixed(2)}\n`
-    })
-    csv += "\n"
+  const exportTransactionsReport = () => {
+    const reportData = filteredTransactions.map((transaction) => ({
+      Artículo: transaction.itemName,
+      Profesor: transaction.teacherName,
+      Cantidad: transaction.quantity,
+      Tipo: transaction.type === "loan" ? "Préstamo" : "Donación",
+      Fecha: transaction.date,
+      "Fecha Devolución": transaction.returnDate || "",
+      Estado: transaction.status,
+      Notas: transaction.notes || "",
+    }))
 
-    // Transacciones recientes
-    csv += "TRANSACCIONES RECIENTES\n"
-    csv += "Artículo,Profesor,Cantidad,Tipo,Fecha,Estado\n"
-    data.transaccionesRecientes.forEach((t: any) => {
-      csv += `${t.articulo},${t.profesor},${t.cantidad},${t.tipo},${t.fecha},${t.estado}\n`
-    })
-    csv += "\n"
-
-    // Bajas recientes
-    csv += "BAJAS RECIENTES\n"
-    csv += "Artículo,Cantidad,Razón,Fecha,Notas\n"
-    data.bajasRecientes.forEach((d: any) => {
-      csv += `${d.articulo},${d.cantidad},${d.razon},${d.fecha},"${d.notas}"\n`
-    })
-
-    return csv
+    exportToCSV(
+      reportData,
+      `transacciones_${format(dateRange.from, "yyyy-MM-dd")}_${format(dateRange.to, "yyyy-MM-dd")}`,
+    )
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold">Reportes y Análisis</h2>
-        <Button onClick={exportReport}>
-          <Download className="h-4 w-4 mr-2" />
-          Exportar Reporte
-        </Button>
-      </div>
+      {/* Controles */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Reportes y Estadísticas
+          </CardTitle>
+          <CardDescription>Analiza el rendimiento y estado del inventario</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <Select value={reportType} onValueChange={setReportType}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Tipo de reporte" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="overview">Resumen General</SelectItem>
+                <SelectItem value="inventory">Inventario</SelectItem>
+                <SelectItem value="transactions">Transacciones</SelectItem>
+                <SelectItem value="disposals">Bajas</SelectItem>
+              </SelectContent>
+            </Select>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Resumen de Inventario</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalItems}</div>
-            <p className="text-xs text-muted-foreground">Total de artículos en stock</p>
-            <div className="flex gap-2 mt-2">
-              <Badge variant="outline" className="text-xs">
-                {donatedItems} donados
-              </Badge>
-              <Badge variant="outline" className="text-xs">
-                {purchasedItems} comprados
-              </Badge>
+            <div className="flex gap-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="gap-2 bg-transparent">
+                    <CalendarIcon className="h-4 w-4" />
+                    {format(dateRange.from, "dd/MM/yyyy")} - {format(dateRange.to, "dd/MM/yyyy")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="range"
+                    selected={{ from: dateRange.from, to: dateRange.to }}
+                    onSelect={(range) => {
+                      if (range?.from && range?.to) {
+                        setDateRange({ from: range.from, to: range.to })
+                      }
+                    }}
+                    numberOfMonths={2}
+                  />
+                </PopoverContent>
+              </Popover>
+
+              <Button onClick={exportInventoryReport} variant="outline" className="gap-2 bg-transparent">
+                <Download className="h-4 w-4" />
+                Exportar Inventario
+              </Button>
+
+              <Button onClick={exportTransactionsReport} variant="outline" className="gap-2 bg-transparent">
+                <Download className="h-4 w-4" />
+                Exportar Transacciones
+              </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${totalValue.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">Solo artículos comprados</p>
-          </CardContent>
-        </Card>
+      {/* Estadísticas Generales */}
+      {reportType === "overview" && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Artículos</CardTitle>
+                <Package className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.totalItems}</div>
+                <p className="text-xs text-muted-foreground">En inventario</p>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Artículos en Préstamo</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalLoaned}</div>
-            <p className="text-xs text-muted-foreground">{activeLoans.length} préstamos activos</p>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">${stats.totalValue.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">Valor del inventario</p>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Artículos Dados de Baja</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalDisposed}</div>
-            <p className="text-xs text-muted-foreground">{disposals.length} eventos de baja</p>
-          </CardContent>
-        </Card>
-      </div>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Préstamos Activos</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.activeLoans}</div>
+                <p className="text-xs text-muted-foreground">
+                  {stats.overdueLoans > 0 && <span className="text-red-600">{stats.overdueLoans} vencidos</span>}
+                </p>
+              </CardContent>
+            </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Category Breakdown */}
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Alertas</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600">{stats.lowStockItems + stats.outOfStockItems}</div>
+                <p className="text-xs text-muted-foreground">Stock bajo/agotado</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Gráficos */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Distribución por Tipo</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={typeData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      {typeData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Artículos por Categoría</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={categoryData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="category" angle={-45} textAnchor="end" height={100} />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#8884d8" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
+
+          {transactionTrends.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Tendencia de Transacciones</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={transactionTrends}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip />
+                    <Line type="monotone" dataKey="préstamos" stroke="#8884d8" strokeWidth={2} />
+                    <Line type="monotone" dataKey="donaciones" stroke="#82ca9d" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
+
+      {/* Reporte de Inventario */}
+      {reportType === "inventory" && (
         <Card>
           <CardHeader>
-            <CardTitle>Inventario por Categoría</CardTitle>
-            <CardDescription>Desglose de artículos y valor por categoría</CardDescription>
+            <CardTitle>Reporte de Inventario</CardTitle>
+            <CardDescription>Estado actual de todos los artículos</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {Object.entries(categoryStats).map(([category, stats]) => (
-                <div key={category} className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium">{category}</p>
-                    <p className="text-sm text-muted-foreground">{stats.count} artículos</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium">${stats.value.toFixed(2)}</p>
-                  </div>
-                </div>
-              ))}
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Artículo</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead>Categoría</TableHead>
+                    <TableHead className="text-center">Cantidad</TableHead>
+                    <TableHead className="text-center">Estado</TableHead>
+                    <TableHead className="text-center">Valor</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {items.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium">{item.name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={item.type === "herramienta" ? "bg-blue-50" : "bg-green-50"}>
+                          {item.type === "herramienta" ? (
+                            <Wrench className="h-3 w-3 mr-1" />
+                          ) : (
+                            <Package className="h-3 w-3 mr-1" />
+                          )}
+                          {item.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{item.category}</TableCell>
+                      <TableCell className="text-center">{item.quantity}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge
+                          variant={item.status === "active" ? "default" : "destructive"}
+                          className={
+                            item.status === "active"
+                              ? "bg-green-100 text-green-800"
+                              : item.status === "low-stock"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-red-100 text-red-800"
+                          }
+                        >
+                          {item.status === "active"
+                            ? "Activo"
+                            : item.status === "low-stock"
+                              ? "Stock Bajo"
+                              : "Sin Stock"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {item.cost ? `$${(item.cost * item.quantity).toFixed(2)}` : "-"}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           </CardContent>
         </Card>
+      )}
 
-        {/* Disposal Reasons */}
+      {/* Reporte de Transacciones */}
+      {reportType === "transactions" && (
         <Card>
           <CardHeader>
-            <CardTitle>Análisis de Bajas</CardTitle>
-            <CardDescription>Desglose de razones de baja</CardDescription>
+            <CardTitle>Reporte de Transacciones</CardTitle>
+            <CardDescription>
+              Transacciones del {format(dateRange.from, "dd/MM/yyyy")} al {format(dateRange.to, "dd/MM/yyyy")}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {Object.entries(disposalReasons).map(([reason, count]) => (
-                <div key={reason} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">{reason}</Badge>
-                  </div>
-                  <span className="font-medium">{count} artículos</span>
-                </div>
-              ))}
-              {Object.keys(disposalReasons).length === 0 && (
-                <p className="text-muted-foreground text-center py-4">No se han registrado bajas aún</p>
-              )}
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Artículo</TableHead>
+                    <TableHead>Profesor</TableHead>
+                    <TableHead>Tipo</TableHead>
+                    <TableHead className="text-center">Cantidad</TableHead>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Devolución</TableHead>
+                    <TableHead className="text-center">Estado</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredTransactions.map((transaction) => (
+                    <TableRow key={transaction.id}>
+                      <TableCell className="font-medium">{transaction.itemName}</TableCell>
+                      <TableCell>{transaction.teacherName}</TableCell>
+                      <TableCell>
+                        <Badge variant={transaction.type === "loan" ? "default" : "secondary"}>
+                          {transaction.type === "loan" ? "Préstamo" : "Donación"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">{transaction.quantity}</TableCell>
+                      <TableCell>{format(parseISO(transaction.date), "dd/MM/yyyy")}</TableCell>
+                      <TableCell>
+                        {transaction.returnDate ? format(parseISO(transaction.returnDate), "dd/MM/yyyy") : "-"}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge
+                          variant={
+                            transaction.status === "active"
+                              ? "default"
+                              : transaction.status === "returned"
+                                ? "secondary"
+                                : "destructive"
+                          }
+                        >
+                          {transaction.status === "active"
+                            ? "Activo"
+                            : transaction.status === "returned"
+                              ? "Devuelto"
+                              : "Vencido"}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           </CardContent>
         </Card>
+      )}
 
-        {/* Recent Activity */}
+      {/* Reporte de Bajas */}
+      {reportType === "disposals" && (
         <Card>
           <CardHeader>
-            <CardTitle>Transacciones Recientes</CardTitle>
-            <CardDescription>Últimos préstamos y donaciones</CardDescription>
+            <CardTitle>Reporte de Bajas</CardTitle>
+            <CardDescription>
+              Bajas registradas del {format(dateRange.from, "dd/MM/yyyy")} al {format(dateRange.to, "dd/MM/yyyy")}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {recentTransactions.map((transaction) => (
-                <div key={transaction.id} className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-sm">{transaction.itemName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {transaction.teacherName} • {new Date(transaction.date).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <Badge variant={transaction.type === "loan" ? "default" : "secondary"}>
-                    {transaction.type === "loan" ? "préstamo" : "donación"}
-                  </Badge>
-                </div>
-              ))}
-              {recentTransactions.length === 0 && (
-                <p className="text-muted-foreground text-center py-4">No se han registrado transacciones aún</p>
-              )}
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Artículo</TableHead>
+                    <TableHead className="text-center">Cantidad</TableHead>
+                    <TableHead>Motivo</TableHead>
+                    <TableHead>Fecha</TableHead>
+                    <TableHead>Notas</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredDisposals.map((disposal) => (
+                    <TableRow key={disposal.id}>
+                      <TableCell className="font-medium">{disposal.itemName}</TableCell>
+                      <TableCell className="text-center">{disposal.quantity}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="bg-red-50 text-red-700">
+                          {disposal.reason === "damaged"
+                            ? "Dañado"
+                            : disposal.reason === "expired"
+                              ? "Vencido"
+                              : disposal.reason === "worn-out"
+                                ? "Desgastado"
+                                : disposal.reason === "obsolete"
+                                  ? "Obsoleto"
+                                  : "Otro"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{format(parseISO(disposal.date), "dd/MM/yyyy")}</TableCell>
+                      <TableCell>{disposal.notes || "-"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           </CardContent>
         </Card>
-
-        {/* Recent Disposals */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Bajas Recientes</CardTitle>
-            <CardDescription>Últimas bajas de artículos</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {recentDisposals.map((disposal) => (
-                <div key={disposal.id} className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-sm">{disposal.itemName}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {disposal.quantity} unidades • {new Date(disposal.date).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <Badge variant="outline">{getReasonText(disposal.reason)}</Badge>
-                </div>
-              ))}
-              {recentDisposals.length === 0 && (
-                <p className="text-muted-foreground text-center py-4">No se han registrado bajas aún</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      )}
     </div>
   )
 }
