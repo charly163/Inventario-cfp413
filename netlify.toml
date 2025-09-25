@@ -1,32 +1,34 @@
 [build]
   command = "npm run build"
   publish = ".next"
+  functions = ".netlify/functions"
 
 [build.environment]
   NEXT_TELEMETRY_DISABLED = "1"
   NODE_VERSION = "20.11.0"
   NPM_VERSION = "10.2.4"
-  # Forzar reconstrucción limpia
-  NETLIFY_NEXT_PLUGIN_SKIP = "false"
-
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
-  [plugins.inputs]
-    # Forzar regeneración de rutas estáticas
-    forceSync = true
+  # Desactivar el plugin de Next.js de Netlify para usar la compilación estándar
+  NETLIFY_NEXT_PLUGIN_SKIP = "true"
+  # Usar el runtime de Node.js 20
+  NODE_OPTIONS = "--version=20.11.0"
 
 # Configuración de cabeceras para evitar caché
 [[headers]]
   for = "/*"
   [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate"
-    Pragma = "no-cache"
-    Expires = "0"
+    Cache-Control = "public, max-age=0, must-revalidate"
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "DENY"
     X-XSS-Protection = "1; mode=block"
+    
+# Redirecciones para manejar rutas de Next.js
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
 
 [dev]
   command = "npm run dev"
   port = 3000
   publish = ".next"
+  target = "experimental"
