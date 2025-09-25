@@ -8,41 +8,40 @@
   NODE_VERSION = "20.11.0"
   NPM_VERSION = "10.2.4"
   
-  # Desactivar telemetría
-  NEXT_TELEMETRY_DISABLED = "1"
-  
-  # Configuración de npm
-  NPM_FLAGS = "--no-fund --no-audit --prefer-offline"
-  NPM_USE_LOCAL = "true"
-  
-  # Entorno de producción
+  # Configuración de entorno
   NODE_ENV = "production"
   
-  # Desactivar el plugin de Next.js de Netlify
+  # Configuración de npm
+  NPM_FLAGS = "--omit=dev --prefer-offline --no-audit --no-fund"
+  
+  # Configuración de Next.js
+  NEXT_TELEMETRY_DISABLED = "1"
+  
+  # Desactivar el plugin de Next.js de Netlify (usamos export estático)
   NETLIFY_NEXT_PLUGIN_SKIP = "true"
   
   # Limpiar configuraciones problemáticas
   NODE_OPTIONS = ""
   NPM_CONFIG_PRODUCTION = "false"
 
-# Configuración de cabeceras de seguridad
-[[headers]]
-  for = "/*"
-  [headers.values]
-    Cache-Control = "public, max-age=0, must-revalidate"
-    X-Content-Type-Options = "nosniff"
-    X-Frame-Options = "DENY"
-    X-XSS-Protection = "1; mode=block"
-
-# Redirecciones para SPA (Single Page Application)
+# Configuración de redirecciones para SPA
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+  force = false
+
+# Configuración de encabezados
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
 
 # Configuración para desarrollo local
 [dev]
   command = "npm run dev"
   port = 3000
   publish = ".next"
-  target = "experimental"
