@@ -6,9 +6,25 @@
   NEXT_TELEMETRY_DISABLED = "1"
   NODE_VERSION = "20.11.0"
   NPM_VERSION = "10.2.4"
+  # Forzar reconstrucción limpia
+  NETLIFY_NEXT_PLUGIN_SKIP = "false"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+  [plugins.inputs]
+    # Forzar regeneración de rutas estáticas
+    forceSync = true
+
+# Configuración de cabeceras para evitar caché
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+    Pragma = "no-cache"
+    Expires = "0"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
 
 [dev]
   command = "npm run dev"
