@@ -42,14 +42,22 @@ export default function ToolHistoryModal({ item, transactions, isOpen, onClose }
       }
     }
 
-    const loans = itemTransactions.filter((t) => t.type === "loan")
-    const donations = itemTransactions.filter((t) => t.type === "donation")
-    const activeLoans = loans.filter((t) => t.status === "active")
-    const overdueLoans = loans.filter((t) => t.status === "overdue")
+    // Filtrar transacciones de préstamos (tipo 'prestamo')
+    const loans = itemTransactions.filter((t) => t.type === 'prestamo')
+    // Filtrar transacciones de donaciones (tipo 'entrada' con notas que indiquen donación)
+    const donations = itemTransactions.filter((t) => t.type === 'entrada' && t.notes?.toLowerCase().includes('donación'))
+    // Préstamos activos (tipo 'prestamo' con estado 'activo' o 'pendiente')
+    const activeLoans = loans.filter((t) => t.status === 'activo' || t.status === 'pendiente')
+    // Préstamos vencidos (tipo 'prestamo' con estado 'vencido' o fecha de retorno pasada)
+    const overdueLoans = loans.filter((t) => 
+      t.status === 'vencido' || 
+      (t.return_date && isAfter(new Date(), parseISO(t.return_date)))
+    )
 
-    const totalQuantityLoaned = loans.reduce((sum, t) => sum + t.quantity, 0)
-    const totalQuantityDonated = donations.reduce((sum, t) => sum + t.quantity, 0)
-    const currentlyLoaned = activeLoans.reduce((sum, t) => sum + t.quantity, 0)
+    // Calcular cantidades totales
+    const totalQuantityLoaned = loans.reduce((sum, t) => sum + (t.quantity || 0), 0)
+    const totalQuantityDonated = donations.reduce((sum, t) => sum + (t.quantity || 0), 0)
+    const currentlyLoaned = activeLoans.reduce((sum, t) => sum + (t.quantity || 0), 0)
 
     return {
       totalLoans: loans.length,
@@ -63,44 +71,57 @@ export default function ToolHistoryModal({ item, transactions, isOpen, onClose }
   }, [item, itemTransactions])
 
   const getStatusBadge = (transaction: Transaction) => {
-    if (transaction.type === "donation") {
+    // Mostrar etiqueta de donación para entradas con notas de donación
+    if (transaction.type === 'entrada' && transaction.notes?.toLowerCase().includes('donación')) {
       return <Badge className="bg-green-100 text-green-800 border-green-300">Donación</Badge>
     }
 
-    switch (transaction.status) {
-      case "active":
-        // Verificar si está vencido
-        if (transaction.returnDate && isAfter(new Date(), parseISO(transaction.returnDate))) {
-          return (
-            <Badge className="bg-red-100 text-red-800 border-red-300 animate-pulse">
-              <AlertCircle className="h-3 w-3 mr-1" />
-              Vencido
-            </Badge>
-          )
-        }
-        return (
-          <Badge className="bg-blue-100 text-blue-800 border-blue-300">
-            <Clock className="h-3 w-3 mr-1" />
-            Activo
-          </Badge>
-        )
-      case "returned":
-        return (
-          <Badge className="bg-gray-100 text-gray-800 border-gray-300">
-            <CheckCircle className="h-3 w-3 mr-1" />
-            Devuelto
-          </Badge>
-        )
-      case "overdue":
+    // Mostrar etiqueta de entrada/salida para otros tipos de transacciones
+    if (transaction.type === 'entrada') {
+      return <Badge className="bg-purple-100 text-purple-800 border-purple-300">Entrada</Badge>
+    }
+    if (transaction.type === 'salida') {
+      return <Badge className="bg-orange-100 text-orange-800 border-orange-300">Salida</Badge>
+    }
+    if (transaction.type === 'devolucion') {
+      return <Badge className="bg-gray-100 text-gray-800 border-gray-300">Devolución</Badge>
+    }
+
+    // Para préstamos, mostrar el estado correspondiente
+    if (transaction.type === 'prestamo') {
+      // Verificar si está vencido
+      const isOverdue = transaction.return_date && isAfter(new Date(), parseISO(transaction.return_date))
+      
+      if (isOverdue || transaction.status === 'vencido') {
         return (
           <Badge className="bg-red-100 text-red-800 border-red-300 animate-pulse">
             <AlertCircle className="h-3 w-3 mr-1" />
             Vencido
           </Badge>
         )
-      default:
-        return <Badge variant="outline">Desconocido</Badge>
+      }
+      
+      if (transaction.status === 'activo' || transaction.status === 'pendiente') {
+        return (
+          <Badge className="bg-blue-100 text-blue-800 border-blue-300">
+            <Clock className="h-3 w-3 mr-1" />
+            Activo
+          </Badge>
+        )
+      }
+      
+      if (transaction.status === 'completado' || transaction.notes?.toLowerCase().includes('devuelto')) {
+        return (
+          <Badge className="bg-gray-100 text-gray-800 border-gray-300">
+            <CheckCircle className="h-3 w-3 mr-1" />
+            Devuelto
+          </Badge>
+        )
+      }
     }
+    
+    // Estado por defecto
+    return <Badge variant="outline">{transaction.status || 'Desconocido'}</Badge>
   }
 
   if (!item) return null
@@ -125,10 +146,15 @@ export default function ToolHistoryModal({ item, transactions, isOpen, onClose }
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <div>
-                  <span className="font-medium">Nombre:</span> {item.name}
+                  <span className="font-medium">{item.name}</span>
                 </div>
+                {item.brand && (
+                  <div>
+                    <span className="text-sm text-gray-500">{item.brand}</span>
+                  </div>
+                )}
                 <div>
-                  <span className="font-medium">Categoría:</span> {item.category}
+                  <span className="text-sm text-gray-500">{item.category}</span>
                 </div>
                 <div>
                   <span className="font-medium">Tipo:</span>{" "}
@@ -140,33 +166,29 @@ export default function ToolHistoryModal({ item, transactions, isOpen, onClose }
                   <span className="font-medium">Stock actual:</span> {item.quantity} unidades
                 </div>
               </div>
-              <div className="space-y-2">
-                {item.brand && (
-                  <div>
-                    <span className="font-medium">Marca:</span> {item.brand}
-                  </div>
-                )}
+              <div>
                 {item.location && (
                   <div>
                     <span className="font-medium">Ubicación:</span> {item.location}
                   </div>
                 )}
-                <div>
-                  <span className="font-medium">Condición:</span>{" "}
-                  <Badge
-                    variant="outline"
-                    className={
-                      item.condition === "nuevo"
-                        ? "bg-green-50 text-green-700"
-                        : item.condition === "usado"
-                          ? "bg-blue-50 text-blue-700"
-                          : item.condition === "regular"
-                            ? "bg-yellow-50 text-yellow-700"
-                            : "bg-red-50 text-red-700"
-                    }
-                  >
-                    {item.condition}
-                  </Badge>
+                <div className="space-y-1">
+                  <div className="font-medium">Condición</div>
+                  <div className="text-sm text-gray-500">
+                    {item.condition === 'nuevo' && 'Nuevo'}
+                    {item.condition === 'bueno' && 'Buen estado'}
+                    {item.condition === 'regular' && 'Estado regular'}
+                    {item.condition === 'malo' && 'Mal estado'}
+                    {!item.condition && 'No especificado'}
+                  </div>
+                  {item.condition && (
+                    <div className="mt-1 text-xs text-gray-400">
+                      {item.condition === 'nuevo' && 'Sin uso, en perfecto estado'}
+                      {item.condition === 'bueno' && 'Algunos signos de uso, pero funcional'}
+                      {item.condition === 'regular' && 'Muestra desgaste, necesita mantenimiento'}
+                      {item.condition === 'malo' && 'Requiere reparación o reemplazo'}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <span className="font-medium">Actualmente prestado:</span> {stats.currentlyLoaned} unidades
@@ -248,20 +270,26 @@ export default function ToolHistoryModal({ item, transactions, isOpen, onClose }
                       {itemTransactions.map((transaction) => (
                         <TableRow key={transaction.id}>
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Calendar className="h-4 w-4 text-muted-foreground" />
-                              {format(parseISO(transaction.date), "dd/MM/yyyy", { locale: es })}
-                            </div>
+                            {transaction.type === 'prestamo' && (
+                              <div className="mt-1 text-sm text-gray-500">
+                                <div>Vence: {transaction.return_date ? format(parseISO(transaction.return_date), 'PP') : 'Sin fecha'}</div>
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <User className="h-4 w-4 text-muted-foreground" />
-                              {transaction.teacherName}
+                              <div className="text-sm text-gray-500">
+                                {transaction.teacher_name || transaction.borrower || 'Sin especificar'}
+                              </div>
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={transaction.type === "loan" ? "default" : "secondary"}>
-                              {transaction.type === "loan" ? "Préstamo" : "Donación"}
+                            <Badge variant={transaction.type === "prestamo" ? "default" : "secondary"}>
+                              {transaction.type === "prestamo" ? "Préstamo" : 
+                               transaction.type === "entrada" ? "Entrada" : 
+                               transaction.type === "salida" ? "Salida" : 
+                               transaction.type === "devolucion" ? "Devolución" : 
+                               transaction.type}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-center">
@@ -271,10 +299,9 @@ export default function ToolHistoryModal({ item, transactions, isOpen, onClose }
                             </div>
                           </TableCell>
                           <TableCell>
-                            {transaction.returnDate ? (
-                              <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-muted-foreground" />
-                                {format(parseISO(transaction.returnDate), "dd/MM/yyyy", { locale: es })}
+                            {transaction.return_date ? (
+                              <div className="text-sm text-gray-500">
+                                <div>Devuelto: {format(parseISO(transaction.return_date), 'PP')}</div>
                               </div>
                             ) : (
                               <span className="text-muted-foreground">-</span>

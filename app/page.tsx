@@ -60,19 +60,34 @@ export interface Item {
   addedDate: string
   lastUpdated: string
   type: "herramienta" | "insumo"
+  brand?: string
+  condition?: string
+  image_url?: string
+  source?: string
+  cost?: number
+  acquisition_date?: string
+  created_at?: string
+  updated_at?: string
 }
 
 export interface Transaction {
   id: string
+  item_id: string
+  item_name: string
   itemId: string
   itemName: string
   type: "prestamo" | "devolucion" | "entrada" | "salida"
   quantity: number
+  teacher_id?: string
+  teacher_name?: string
   borrower?: string
   date: string
+  return_date?: string
   dueDate?: string
-  notes?: string
-  status: "activo" | "completado" | "vencido"
+  notes: string | null
+  status: "activo" | "completado" | "vencido" | "pendiente"
+  created_at: string
+  updated_at: string
 }
 
 export interface Disposal {
