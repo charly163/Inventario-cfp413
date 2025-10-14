@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -16,35 +14,52 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, Edit, Package } from "lucide-react"
-import { format } from "date-fns"
-import { es } from "date-fns/locale"
-import { cn } from "@/lib/utils"
+import { Edit, Package } from "lucide-react"
 import { toast } from "sonner"
-import type { Item, AppSettings } from "@/app/page"
+import type { Item } from "@/src/types/inventory.types"
+import { getCategories, getLocations, getSources, getConditions } from "@/src/lib/database"
 
 interface EditItemFormProps {
   item: Item
-  settings: AppSettings
-  onUpdateItem: (updatedItem: Item) => Promise<void>
+  onUpdateItem: (id: string, updatedItem: Partial<Item>) => Promise<void>
   onClose: () => void
+  lowStockThreshold: number
 }
 
-export default function EditItemForm({ item, settings, onUpdateItem, onClose }: EditItemFormProps) {
+export default function EditItemForm({ item, onUpdateItem, onClose, lowStockThreshold }: EditItemFormProps) {
   const [name, setName] = useState(item.name)
   const [category, setCategory] = useState(item.category)
   const [quantity, setQuantity] = useState(item.quantity.toString())
-  const [source, setSource] = useState(item.source)
   const [cost, setCost] = useState(item.cost?.toString() || "")
-  const [acquisitionDate, setAcquisitionDate] = useState<Date>(new Date(item.acquisitionDate))
   const [description, setDescription] = useState(item.description || "")
   const [type, setType] = useState<"herramienta" | "insumo">(item.type)
   const [brand, setBrand] = useState(item.brand || "")
-  const [condition, setCondition] = useState<"nuevo" | "usado" | "regular" | "malo">(item.condition)
+  const [condition, setCondition] = useState<"nuevo" | "usado" | "regular" | "malo" | string>(item.condition || "nuevo")
   const [location, setLocation] = useState(item.location || "")
+  const [source, setSource] = useState((item as any).source || "")
+  const [acquisitionDate, setAcquisitionDate] = useState<string>((item as any).acquisition_date || "")
+  const [imageUrl, setImageUrl] = useState((item as any).image_url || (item as any).image || "")
   const [loading, setLoading] = useState(false)
+  const [categories, setCategories] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
+  const [sources, setSources] = useState<any[]>([]);
+  const [conditions, setConditions] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const [fetchedCategories, fetchedLocations, fetchedSources, fetchedConditions] = await Promise.all([
+        getCategories(),
+        getLocations(),
+        getSources(),
+        getConditions(),
+      ]);
+      setCategories(fetchedCategories);
+      setLocations(fetchedLocations);
+      setSources(fetchedSources);
+      setConditions(fetchedConditions);
+    };
+    fetchData();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -73,27 +88,27 @@ export default function EditItemForm({ item, settings, onUpdateItem, onClose }: 
       let status: "active" | "low-stock" | "out-of-stock" = "active"
       if (quantityNum === 0) {
         status = "out-of-stock"
-      } else if (quantityNum < settings.lowStockThreshold && type === "insumo") {
+      } else if (quantityNum < lowStockThreshold && type === "insumo") {
         status = "low-stock"
       }
 
-      const updatedItem: Item = {
-        ...item,
+      const updatedItem: Partial<Item> = {
         name: name.trim(),
         category,
         quantity: quantityNum,
-        source,
         cost: costNum,
-        acquisitionDate: format(acquisitionDate, "yyyy-MM-dd"),
         description: description.trim() || undefined,
         status,
         type,
         brand: brand.trim() || undefined,
-        condition,
+        condition: (condition as any) || undefined,
         location: location.trim() || undefined,
+        source: source || undefined,
+        acquisition_date: acquisitionDate || undefined,
+        image: imageUrl || undefined,
       }
 
-      await onUpdateItem(updatedItem)
+      await onUpdateItem(item.id, updatedItem)
       onClose()
     } catch (error) {
       console.error("Error updating item:", error)
@@ -150,9 +165,9 @@ export default function EditItemForm({ item, settings, onUpdateItem, onClose }: 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {settings.categories.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.name}>
+                      {cat.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -174,15 +189,15 @@ export default function EditItemForm({ item, settings, onUpdateItem, onClose }: 
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="source">Fuente *</Label>
+              <Label htmlFor="source">Fuente</Label>
               <Select value={source} onValueChange={setSource} required>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Selecciona una fuente" />
                 </SelectTrigger>
                 <SelectContent>
-                  {settings.sources.map((src) => (
-                    <SelectItem key={src} value={src}>
-                      {src}
+                  {sources.map((s) => (
+                    <SelectItem key={s.id} value={s.name}>
+                      {s.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -215,16 +230,17 @@ export default function EditItemForm({ item, settings, onUpdateItem, onClose }: 
             </div>
 
             <div>
-              <Label htmlFor="condition">Condición *</Label>
-              <Select value={condition} onValueChange={(value) => setCondition(value as any)} required>
+              <Label htmlFor="condition">Condición</Label>
+              <Select value={condition} onValueChange={(value) => setCondition(value as any)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="nuevo">Nuevo</SelectItem>
-                  <SelectItem value="usado">Usado</SelectItem>
-                  <SelectItem value="regular">Regular</SelectItem>
-                  <SelectItem value="malo">Malo</SelectItem>
+                  {conditions.map((c) => (
+                    <SelectItem key={c.id} value={c.name}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -238,9 +254,9 @@ export default function EditItemForm({ item, settings, onUpdateItem, onClose }: 
                   <SelectValue placeholder="Selecciona ubicación" />
                 </SelectTrigger>
                 <SelectContent>
-                  {settings.locations.map((loc) => (
-                    <SelectItem key={loc} value={loc}>
-                      {loc}
+                  {locations.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.name}>
+                      {loc.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -248,30 +264,8 @@ export default function EditItemForm({ item, settings, onUpdateItem, onClose }: 
             </div>
 
             <div>
-              <Label>Fecha de adquisición *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !acquisitionDate && "text-muted-foreground",
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {acquisitionDate ? format(acquisitionDate, "PPP", { locale: es }) : "Selecciona fecha"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={acquisitionDate}
-                    onSelect={(date) => date && setAcquisitionDate(date)}
-                    disabled={(date) => date > new Date()}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <Label htmlFor="acquisitionDate">Fecha de adquisición</Label>
+              <Input id="acquisitionDate" type="date" value={acquisitionDate} onChange={(e) => setAcquisitionDate(e.target.value)} />
             </div>
           </div>
 
@@ -284,6 +278,13 @@ export default function EditItemForm({ item, settings, onUpdateItem, onClose }: 
               placeholder="Descripción detallada del artículo..."
               rows={3}
             />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="image">Imagen (URL)</Label>
+              <Input id="image" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..."/>
+            </div>
           </div>
 
           <DialogFooter>

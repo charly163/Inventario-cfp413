@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator"
 import { History, Calendar, User, Package, AlertCircle, CheckCircle, Clock } from "lucide-react"
 import { format, parseISO, isAfter } from "date-fns"
 import { es } from "date-fns/locale"
-import type { Item, Transaction } from "@/app/page"
+import { Item, Transaction } from "@/src/types/inventory.types"
 
 interface ToolHistoryModalProps {
   item: Item | null
@@ -24,7 +24,7 @@ export default function ToolHistoryModal({ item, transactions, isOpen, onClose }
     if (!item) return []
 
     return transactions
-      .filter((transaction) => transaction.itemId === item.id)
+      .filter((transaction) => (transaction.itemId === item.id || transaction.item_id === item.id))
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   }, [item, transactions])
 
@@ -46,8 +46,8 @@ export default function ToolHistoryModal({ item, transactions, isOpen, onClose }
     const loans = itemTransactions.filter((t) => t.type === 'prestamo')
     // Filtrar transacciones de donaciones (tipo 'entrada' con notas que indiquen donación)
     const donations = itemTransactions.filter((t) => t.type === 'entrada' && t.notes?.toLowerCase().includes('donación'))
-    // Préstamos activos (tipo 'prestamo' con estado 'activo' o 'pendiente')
-    const activeLoans = loans.filter((t) => t.status === 'activo' || t.status === 'pendiente')
+    // Préstamos activos (tipo 'prestamo' con estado 'activo')
+    const activeLoans = loans.filter((t) => t.status === 'activo')
     // Préstamos vencidos (tipo 'prestamo' con estado 'vencido' o fecha de retorno pasada)
     const overdueLoans = loans.filter((t) => 
       t.status === 'vencido' || 
@@ -82,9 +82,6 @@ export default function ToolHistoryModal({ item, transactions, isOpen, onClose }
     }
     if (transaction.type === 'salida') {
       return <Badge className="bg-orange-100 text-orange-800 border-orange-300">Salida</Badge>
-    }
-    if (transaction.type === 'devolucion') {
-      return <Badge className="bg-gray-100 text-gray-800 border-gray-300">Devolución</Badge>
     }
 
     // Para préstamos, mostrar el estado correspondiente
@@ -146,15 +143,10 @@ export default function ToolHistoryModal({ item, transactions, isOpen, onClose }
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <div>
-                  <span className="font-medium">{item.name}</span>
+                  <span className="font-medium">Nombre:</span> {item.name}
                 </div>
-                {item.brand && (
-                  <div>
-                    <span className="text-sm text-gray-500">{item.brand}</span>
-                  </div>
-                )}
                 <div>
-                  <span className="text-sm text-gray-500">{item.category}</span>
+                  <span className="font-medium">Categoría:</span> {item.category}
                 </div>
                 <div>
                   <span className="font-medium">Tipo:</span>{" "}
@@ -166,29 +158,33 @@ export default function ToolHistoryModal({ item, transactions, isOpen, onClose }
                   <span className="font-medium">Stock actual:</span> {item.quantity} unidades
                 </div>
               </div>
-              <div>
+              <div className="space-y-2">
+                {item.brand && (
+                  <div>
+                    <span className="font-medium">Marca:</span> {item.brand}
+                  </div>
+                )}
                 {item.location && (
                   <div>
                     <span className="font-medium">Ubicación:</span> {item.location}
                   </div>
                 )}
-                <div className="space-y-1">
-                  <div className="font-medium">Condición</div>
-                  <div className="text-sm text-gray-500">
-                    {item.condition === 'nuevo' && 'Nuevo'}
-                    {item.condition === 'bueno' && 'Buen estado'}
-                    {item.condition === 'regular' && 'Estado regular'}
-                    {item.condition === 'malo' && 'Mal estado'}
-                    {!item.condition && 'No especificado'}
-                  </div>
-                  {item.condition && (
-                    <div className="mt-1 text-xs text-gray-400">
-                      {item.condition === 'nuevo' && 'Sin uso, en perfecto estado'}
-                      {item.condition === 'bueno' && 'Algunos signos de uso, pero funcional'}
-                      {item.condition === 'regular' && 'Muestra desgaste, necesita mantenimiento'}
-                      {item.condition === 'malo' && 'Requiere reparación o reemplazo'}
-                    </div>
-                  )}
+                <div>
+                  <span className="font-medium">Condición:</span>{" "}
+                  <Badge
+                    variant="outline"
+                    className={
+                      item.condition === "nuevo"
+                        ? "bg-green-50 text-green-700"
+                        : item.condition === "usado"
+                          ? "bg-blue-50 text-blue-700"
+                          : item.condition === "regular"
+                            ? "bg-yellow-50 text-yellow-700"
+                            : "bg-red-50 text-red-700"
+                    }
+                  >
+                    {item.condition}
+                  </Badge>
                 </div>
                 <div>
                   <span className="font-medium">Actualmente prestado:</span> {stats.currentlyLoaned} unidades
@@ -270,26 +266,20 @@ export default function ToolHistoryModal({ item, transactions, isOpen, onClose }
                       {itemTransactions.map((transaction) => (
                         <TableRow key={transaction.id}>
                           <TableCell>
-                            {transaction.type === 'prestamo' && (
-                              <div className="mt-1 text-sm text-gray-500">
-                                <div>Vence: {transaction.return_date ? format(parseISO(transaction.return_date), 'PP') : 'Sin fecha'}</div>
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
                             <div className="flex items-center gap-2">
-                              <div className="text-sm text-gray-500">
-                                {transaction.teacher_name || transaction.borrower || 'Sin especificar'}
-                              </div>
+                              <Calendar className="h-4 w-4 text-muted-foreground" />
+                              {format(parseISO(transaction.date), "dd/MM/yyyy", { locale: es })}
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={transaction.type === "prestamo" ? "default" : "secondary"}>
-                              {transaction.type === "prestamo" ? "Préstamo" : 
-                               transaction.type === "entrada" ? "Entrada" : 
-                               transaction.type === "salida" ? "Salida" : 
-                               transaction.type === "devolucion" ? "Devolución" : 
-                               transaction.type}
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              {transaction.teacherName || transaction.teacher_name}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={transaction.type === "loan" ? "default" : "secondary"}>
+                              {transaction.type === "loan" ? "Préstamo" : "Donación"}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-center">
@@ -299,9 +289,10 @@ export default function ToolHistoryModal({ item, transactions, isOpen, onClose }
                             </div>
                           </TableCell>
                           <TableCell>
-                            {transaction.return_date ? (
-                              <div className="text-sm text-gray-500">
-                                <div>Devuelto: {format(parseISO(transaction.return_date), 'PP')}</div>
+                            {transaction.returnDate ? (
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-muted-foreground" />
+                                {format(parseISO(transaction.returnDate), "dd/MM/yyyy", { locale: es })}
                               </div>
                             ) : (
                               <span className="text-muted-foreground">-</span>

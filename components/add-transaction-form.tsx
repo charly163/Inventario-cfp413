@@ -1,8 +1,6 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -19,13 +17,14 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Checkbox } from "@/components/ui/checkbox"
 import { CalendarIcon, Plus, User } from "lucide-react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import type { Item, Transaction, AppSettings } from "@/app/page"
+import { Item, Transaction } from "@/src/types/inventory.types"
+import type { AppSettings } from "@/app/page"
+import { getTeachers } from "@/src/lib/database"
 
 interface AddTransactionFormProps {
   items: Item[]
@@ -36,14 +35,22 @@ interface AddTransactionFormProps {
 export default function AddTransactionForm({ items, onAddTransaction, settings }: AddTransactionFormProps) {
   const [open, setOpen] = useState(false)
   const [selectedItemId, setSelectedItemId] = useState("")
+  const [teacherId, setTeacherId] = useState("")
   const [teacherName, setTeacherName] = useState("")
-  const [customTeacher, setCustomTeacher] = useState("")
-  const [useCustomTeacher, setUseCustomTeacher] = useState(false)
   const [quantity, setQuantity] = useState("")
   const [type, setType] = useState<"loan" | "donation">("loan")
   const [returnDate, setReturnDate] = useState<Date>()
   const [notes, setNotes] = useState("")
   const [loading, setLoading] = useState(false)
+  const [teachers, setTeachers] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    const fetchTeachers = async () => {
+      const fetchedTeachers = await getTeachers();
+      setTeachers(fetchedTeachers.map(t => ({ id: t.id, name: `${t.first_name} ${t.last_name}` })));
+    };
+    fetchTeachers();
+  }, []);
 
   const selectedItem = items.find((item) => item.id === selectedItemId)
 
@@ -55,9 +62,8 @@ export default function AddTransactionForm({ items, onAddTransaction, settings }
       return
     }
 
-    const finalTeacherName = useCustomTeacher ? customTeacher : teacherName
-    if (!finalTeacherName.trim()) {
-      toast.error("Selecciona o ingresa el nombre del profesor")
+    if (!teacherId.trim()) {
+      toast.error("Selecciona un profesor")
       return
     }
 
@@ -81,13 +87,14 @@ export default function AddTransactionForm({ items, onAddTransaction, settings }
 
     try {
       const transaction: Omit<Transaction, "id"> = {
-        itemId: selectedItem.id,
-        itemName: selectedItem.name,
-        teacherName: finalTeacherName,
+        item_id: selectedItem.id,
+        item_name: selectedItem.name,
+        teacher_id: teacherId,
+        teacher_name: teacherName,
         quantity: quantityNum,
         type,
         date: new Date().toISOString().split("T")[0],
-        returnDate: returnDate ? format(returnDate, "yyyy-MM-dd") : undefined,
+        return_date: returnDate ? format(returnDate, "yyyy-MM-dd") : undefined,
         status: "active",
         notes: notes.trim() || undefined,
       }
@@ -96,9 +103,8 @@ export default function AddTransactionForm({ items, onAddTransaction, settings }
 
       // Reset form
       setSelectedItemId("")
+      setTeacherId("")
       setTeacherName("")
-      setCustomTeacher("")
-      setUseCustomTeacher(false)
       setQuantity("")
       setType("loan")
       setReturnDate(undefined)
@@ -176,39 +182,31 @@ export default function AddTransactionForm({ items, onAddTransaction, settings }
             </div>
           )}
 
-          <div className="flex items-center space-x-2">
-            <Checkbox id="custom-teacher" checked={useCustomTeacher} onCheckedChange={setUseCustomTeacher} />
-            <Label htmlFor="custom-teacher">Ingresar profesor personalizado</Label>
+          <div>
+            <Label htmlFor="teacher">Profesor</Label>
+            <Select
+              value={teacherId}
+              onValueChange={(value) => {
+                setTeacherId(value);
+                const selectedTeacher = teachers.find(t => t.id === value);
+                if (selectedTeacher) {
+                  setTeacherName(selectedTeacher.name);
+                }
+              }}
+              required
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecciona un profesor" />
+              </SelectTrigger>
+              <SelectContent>
+                {teachers.map((teacher) => (
+                  <SelectItem key={teacher.id} value={teacher.id}>
+                    {teacher.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-
-          {useCustomTeacher ? (
-            <div>
-              <Label htmlFor="custom-teacher-name">Nombre del Profesor</Label>
-              <Input
-                id="custom-teacher-name"
-                value={customTeacher}
-                onChange={(e) => setCustomTeacher(e.target.value)}
-                placeholder="Ingresa el nombre del profesor"
-                required
-              />
-            </div>
-          ) : (
-            <div>
-              <Label htmlFor="teacher">Profesor</Label>
-              <Select value={teacherName} onValueChange={setTeacherName} required>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un profesor" />
-                </SelectTrigger>
-                <SelectContent>
-                  {settings.teachers.map((teacher) => (
-                    <SelectItem key={teacher} value={teacher}>
-                      {teacher}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
 
           <div>
             <Label htmlFor="quantity">Cantidad</Label>

@@ -1,7 +1,6 @@
 "use client"
 
-import type React from "react"
-import { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -17,16 +16,17 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Package } from "lucide-react"
-import { toast } from "@/hooks/use-toast"
-import type { Item, AppSettings } from "@/app/page"
+import { toast } from "sonner"
+import { Item } from "@/src/types/inventory.types"
+import { supabase } from "@/lib/supabase"
+import { getCategories, getLocations, getSources, getConditions } from "@/lib/database"
 
 interface AddItemFormProps {
   onAddItem: (item: Omit<Item, "id">) => Promise<void>
-  settings: AppSettings
   defaultType?: "herramienta" | "insumo"
 }
 
-export function AddItemForm({ onAddItem, settings, defaultType }: AddItemFormProps) {
+export function AddItemForm({ onAddItem, defaultType }: AddItemFormProps) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
   const [category, setCategory] = useState("")
@@ -35,64 +35,126 @@ export function AddItemForm({ onAddItem, settings, defaultType }: AddItemFormPro
   const [location, setLocation] = useState("")
   const [description, setDescription] = useState("")
   const [type, setType] = useState<"herramienta" | "insumo">(defaultType || "herramienta")
+  const [source, setSource] = useState("")
+  const [cost, setCost] = useState("")
+  const [acquisitionDate, setAcquisitionDate] = useState("")
+  const [brand, setBrand] = useState("")
+  const [condition, setCondition] = useState<"nuevo" | "usado" | "regular" | "malo">("nuevo")
+  const [image, setImage] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [categories, setCategories] = useState<any[]>([]);
+  const [locations, setLocations] = useState<any[]>([]);
+  const [sources, setSources] = useState<any[]>([]);
+  const [conditions, setConditions] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const [fetchedCategories, fetchedLocations, fetchedSources, fetchedConditions] = await Promise.all([
+        getCategories(),
+        getLocations(),
+        getSources(),
+        getConditions(),
+      ]);
+      setCategories(fetchedCategories);
+      setLocations(fetchedLocations);
+      setSources(fetchedSources);
+      setConditions(fetchedConditions);
+    };
+    fetchData();
+  }, []);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setImage(file)
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!name.trim()) {
-      toast({
-        title: "Error",
-        description: "El nombre es requerido",
-        variant: "destructive",
-      })
+      toast.error("Error", { description: "El nombre es requerido" })
       return
     }
 
     if (!category) {
-      toast({
-        title: "Error",
-        description: "Selecciona una categoría",
-        variant: "destructive",
-      })
+      toast.error("Error", { description: "Selecciona una categoría" })
       return
     }
 
     if (!location) {
-      toast({
-        title: "Error",
-        description: "Selecciona una ubicación",
-        variant: "destructive",
-      })
+      toast.error("Error", { description: "Selecciona una ubicación" })
+      return
+    }
+
+    if (!source) {
+      toast.error("Error", { description: "La fuente es requerida" })
+      return
+    }
+
+    if (!acquisitionDate) {
+      toast.error("Error", { description: "La fecha de adquisición es requerida" })
       return
     }
 
     const quantityNum = Number.parseInt(quantity) || 0
     const minStockNum = Number.parseInt(minStock) || 0
+    const costNum = cost ? Number.parseFloat(cost) : null
 
-    if (quantityNum < 0) {
-      toast({
-        title: "Error",
-        description: "La cantidad debe ser un número válido",
-        variant: "destructive",
-      })
+    if (isNaN(quantityNum) || quantityNum < 0) {
+      toast.error("Error", { description: "La cantidad debe ser un número válido" })
       return
     }
 
     setLoading(true)
 
     try {
-      const newItem: Omit<Item, "id"> = {
+      let imageUrl = null
+
+      // Subir la imagen si existe
+      if (image) {
+        const fileExt = image.name.split('.').pop()
+        const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`
+        const filePath = `items/${fileName}`
+
+        const { data: uploadData, error: uploadError } = await supabase
+          .storage
+          .from('items')
+          .upload(filePath, image)
+
+        if (uploadError) throw uploadError
+
+        // Obtener la URL pública de la imagen
+        const { data: { publicUrl } } = supabase
+          .storage
+          .from('items')
+          .getPublicUrl(filePath)
+
+        imageUrl = publicUrl
+      }
+
+      const newItem: Omit<Item, 'id' | 'created_at' | 'updated_at'> = {
         name: name.trim(),
         category,
         quantity: quantityNum,
-        minStock: minStockNum,
         location,
-        description: description.trim() || "",
-        status: "disponible",
-        addedDate: new Date().toISOString().split("T")[0],
-        lastUpdated: new Date().toISOString().split("T")[0],
+        description: description.trim() || null,
+        status: "active",
+        source,
+        cost: costNum,
+        acquisition_date: acquisitionDate,
+        brand: brand || null,
+        condition,
         type,
+        image: imageUrl,
       }
 
       await onAddItem(newItem)
@@ -104,20 +166,18 @@ export function AddItemForm({ onAddItem, settings, defaultType }: AddItemFormPro
       setMinStock("")
       setLocation("")
       setDescription("")
-      setType(defaultType || "herramienta")
+      setSource("")
+      setCost("")
+      setAcquisitionDate("")
+      setBrand("")
+      setCondition("nuevo")
+      setImage(null)
+      setImagePreview(null)
       setOpen(false)
-
-      toast({
-        title: "Éxito",
-        description: "Artículo agregado correctamente",
-      })
+      toast.success("Ítem agregado correctamente")
     } catch (error) {
       console.error("Error adding item:", error)
-      toast({
-        title: "Error",
-        description: "Error al agregar el artículo",
-        variant: "destructive",
-      })
+      toast.error("Error", { description: "Error al agregar el artículo" })
     } finally {
       setLoading(false)
     }
@@ -175,9 +235,9 @@ export function AddItemForm({ onAddItem, settings, defaultType }: AddItemFormPro
                   <SelectValue placeholder="Selecciona categoría" />
                 </SelectTrigger>
                 <SelectContent>
-                  {settings.categories.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.name}>
+                      {cat.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -196,21 +256,7 @@ export function AddItemForm({ onAddItem, settings, defaultType }: AddItemFormPro
                 required
               />
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="minStock">Stock Mínimo</Label>
-              <Input
-                id="minStock"
-                type="number"
-                min="0"
-                value={minStock}
-                onChange={(e) => setMinStock(e.target.value)}
-                placeholder="0"
-              />
-            </div>
-
+            
             <div>
               <Label htmlFor="location">Ubicación *</Label>
               <Select value={location} onValueChange={setLocation} required>
@@ -218,13 +264,86 @@ export function AddItemForm({ onAddItem, settings, defaultType }: AddItemFormPro
                   <SelectValue placeholder="Selecciona ubicación" />
                 </SelectTrigger>
                 <SelectContent>
-                  {settings.locations.map((loc) => (
-                    <SelectItem key={loc} value={loc}>
-                      {loc}
+                  {locations.map((loc) => (
+                    <SelectItem key={loc.id} value={loc.name}>
+                      {loc.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="source">Fuente</Label>
+              <Select value={source} onValueChange={setSource} required>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona una fuente" />
+                </SelectTrigger>
+                <SelectContent>
+                  {sources.map((s) => (
+                    <SelectItem key={s.id} value={s.name}>
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="cost">Costo</Label>
+              <Input id="cost" type="number" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} placeholder="0.00" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="acquisitionDate">Fecha de adquisición</Label>
+              <Input id="acquisitionDate" type="date" value={acquisitionDate} onChange={(e) => setAcquisitionDate(e.target.value)} />
+            </div>
+
+            <div>
+              <Label htmlFor="brand">Marca</Label>
+              <Input id="brand" value={brand} onChange={(e) => setBrand(e.target.value)} placeholder="Marca" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="condition">Condición</Label>
+              <Select value={condition} onValueChange={(v) => setCondition(v as any)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {conditions.map((c) => (
+                    <SelectItem key={c.id} value={c.name}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="image">Imagen</Label>
+              <Input 
+                id="image" 
+                type="file" 
+                accept="image/*" 
+                onChange={handleImageChange}
+                className="cursor-pointer"
+              />
+              {imagePreview && (
+                <div className="mt-2">
+                  <img 
+                    src={imagePreview} 
+                    alt="Vista previa" 
+                    className="h-20 w-20 object-cover rounded border"
+                  />
+                </div>
+              )}
             </div>
           </div>
 

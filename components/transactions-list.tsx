@@ -9,17 +9,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Search, CheckCircle, Clock, AlertTriangle, CalendarIcon, User, Package, Edit, Filter } from "lucide-react"
+import { Search, CheckCircle, Clock, AlertTriangle, CalendarIcon, User, Package, Edit, Filter, Trash2 } from "lucide-react"
 import { format, parseISO, isAfter } from "date-fns"
 import { es } from "date-fns/locale"
 import { toast } from "sonner"
-import type { Transaction } from "@/app/page"
+import { Transaction } from "@/src/types/inventory.types"
 
 interface TransactionsListProps {
   transactions: Transaction[]
   onMarkReturned: (transactionId: string) => Promise<void>
   onExtendLoan: (transactionId: string, newReturnDate: string) => Promise<void>
   onUpdateReturnDate: (transactionId: string, newReturnDate: string) => Promise<void>
+  onViewDetails?: (transaction: Transaction) => void
+  onDeleteTransaction: (transactionId: string) => Promise<void>
 }
 
 export default function TransactionsList({
@@ -27,6 +29,8 @@ export default function TransactionsList({
   onMarkReturned,
   onExtendLoan,
   onUpdateReturnDate,
+  onViewDetails,
+  onDeleteTransaction,
 }: TransactionsListProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
@@ -39,8 +43,8 @@ export default function TransactionsList({
     return transactions.filter((transaction) => {
       const matchesSearch =
         searchTerm === "" ||
-        transaction.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        transaction.teacherName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (transaction.itemName || transaction.item_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (transaction.teacherName || transaction.teacher_name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
         transaction.notes?.toLowerCase().includes(searchTerm.toLowerCase())
 
       const matchesStatus = statusFilter === "all" || transaction.status === statusFilter
@@ -52,14 +56,16 @@ export default function TransactionsList({
 
   // Estadísticas
   const stats = useMemo(() => {
-    const activeLoans = transactions.filter((t) => t.status === "active" && t.type === "loan").length
+    const activeLoans = transactions.filter((t) => t.status === "activo" && t.type === "prestamo").length
     const overdueLoans = transactions.filter(
-      (t) =>
-        t.status === "overdue" ||
-        (t.status === "active" && t.returnDate && isAfter(new Date(), parseISO(t.returnDate))),
+      (t) => {
+        const returnDate = t.returnDate || t.return_date;
+        return t.status === "vencido" ||
+        (t.status === "activo" && returnDate && isAfter(new Date(), parseISO(returnDate)))
+      },
     ).length
-    const totalDonations = transactions.filter((t) => t.type === "donation").length
-    const returnedLoans = transactions.filter((t) => t.status === "returned").length
+    const totalDonations = transactions.filter((t) => t.type === "entrada").length
+    const returnedLoans = transactions.filter((t) => t.status === "completado").length
 
     return {
       activeLoans,
@@ -70,7 +76,7 @@ export default function TransactionsList({
   }, [transactions])
 
   const getStatusBadge = (transaction: Transaction) => {
-    if (transaction.type === "donation") {
+    if (transaction.type === "entrada") {
       return (
         <Badge className="bg-green-100 text-green-800 border-green-300">
           <Package className="h-3 w-3 mr-1" />
@@ -80,9 +86,10 @@ export default function TransactionsList({
     }
 
     // Verificar si está vencido
-    const isOverdue = transaction.returnDate && isAfter(new Date(), parseISO(transaction.returnDate))
+    const returnDate = transaction.returnDate || transaction.return_date;
+    const isOverdue = returnDate && isAfter(new Date(), parseISO(returnDate));
 
-    if (isOverdue && transaction.status === "active") {
+    if (isOverdue && transaction.status === "activo") {
       return (
         <Badge className="bg-red-100 text-red-800 border-red-300 animate-pulse">
           <AlertTriangle className="h-3 w-3 mr-1" />
@@ -92,21 +99,21 @@ export default function TransactionsList({
     }
 
     switch (transaction.status) {
-      case "active":
+      case "activo":
         return (
           <Badge className="bg-blue-100 text-blue-800 border-blue-300">
             <Clock className="h-3 w-3 mr-1" />
             Activo
           </Badge>
         )
-      case "returned":
+      case "completado":
         return (
           <Badge className="bg-gray-100 text-gray-800 border-gray-300">
             <CheckCircle className="h-3 w-3 mr-1" />
             Devuelto
           </Badge>
         )
-      case "overdue":
+      case "vencido":
         return (
           <Badge className="bg-red-100 text-red-800 border-red-300 animate-pulse">
             <AlertTriangle className="h-3 w-3 mr-1" />
@@ -136,7 +143,8 @@ export default function TransactionsList({
 
   const startEditingReturnDate = (transaction: Transaction) => {
     setEditingReturnDate(transaction.id)
-    setNewReturnDate(transaction.returnDate ? parseISO(transaction.returnDate) : new Date())
+    const returnDate = transaction.returnDate || transaction.return_date;
+    setNewReturnDate(returnDate ? parseISO(returnDate) : new Date())
   }
 
   const cancelEditingReturnDate = () => {
@@ -223,8 +231,10 @@ export default function TransactionsList({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="loan">Préstamos</SelectItem>
-                  <SelectItem value="donation">Donaciones</SelectItem>
+                  <SelectItem value="prestamo">Préstamos</SelectItem>
+                  <SelectItem value="entrada">Donaciones</SelectItem>
+                  <SelectItem value="devolucion">Devoluciones</SelectItem>
+                  <SelectItem value="salida">Salidas</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -234,9 +244,9 @@ export default function TransactionsList({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="active">Activos</SelectItem>
-                  <SelectItem value="returned">Devueltos</SelectItem>
-                  <SelectItem value="overdue">Vencidos</SelectItem>
+                  <SelectItem value="activo">Activos</SelectItem>
+                  <SelectItem value="completado">Devueltos</SelectItem>
+                  <SelectItem value="vencido">Vencidos</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -260,22 +270,26 @@ export default function TransactionsList({
               </TableHeader>
               <TableBody>
                 {filteredTransactions.map((transaction) => {
-                  const isOverdue = transaction.returnDate && isAfter(new Date(), parseISO(transaction.returnDate))
-                  const canMarkReturned = transaction.type === "loan" && transaction.status === "active"
+                  const returnDate = transaction.returnDate || transaction.return_date;
+                  const isOverdue = returnDate && isAfter(new Date(), parseISO(returnDate));
+                  const canMarkReturned = transaction.type === "prestamo" && transaction.status === "activo"
                   const isEditingDate = editingReturnDate === transaction.id
 
                   return (
                     <TableRow key={transaction.id} className={isOverdue ? "bg-red-50" : ""}>
-                      <TableCell className="font-medium">{transaction.itemName}</TableCell>
+                      <TableCell className="font-medium">{transaction.itemName || transaction.item_name}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4 text-muted-foreground" />
-                          {transaction.teacherName}
+                          {transaction.teacherName || transaction.teacher_name}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant={transaction.type === "loan" ? "default" : "secondary"}>
-                          {transaction.type === "loan" ? "Préstamo" : "Donación"}
+                        <Badge variant={transaction.type === "prestamo" ? "default" : "secondary"}>
+                          {transaction.type === "prestamo" ? "Préstamo" : 
+                           transaction.type === "entrada" ? "Donación" : 
+                           transaction.type === "devolucion" ? "Devolución" : 
+                           transaction.type === "salida" ? "Salida" : "Otro"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
@@ -287,11 +301,11 @@ export default function TransactionsList({
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                          {format(parseISO(transaction.date), "dd/MM/yyyy", { locale: es })}
+                          {transaction.date ? format(parseISO(transaction.date), "dd/MM/yyyy", { locale: es }) : ''}
                         </div>
                       </TableCell>
                       <TableCell>
-                        {transaction.returnDate ? (
+                        {returnDate ? (
                           isEditingDate ? (
                             <div className="flex items-center gap-2">
                               <Popover>
@@ -322,7 +336,7 @@ export default function TransactionsList({
                             <div className="flex items-center gap-2">
                               <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                               <span className={isOverdue ? "text-red-600 font-medium" : ""}>
-                                {format(parseISO(transaction.returnDate), "dd/MM/yyyy", { locale: es })}
+                                {format(parseISO(returnDate), "dd/MM/yyyy", { locale: es })}
                               </span>
                               {canMarkReturned && (
                                 <Button
@@ -353,17 +367,41 @@ export default function TransactionsList({
                         )}
                       </TableCell>
                       <TableCell className="text-center">
-                        {canMarkReturned && (
+                        <div className="flex space-x-2 justify-center">
+                          {canMarkReturned && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => onMarkReturned(transaction.id)}
+                              className="gap-1"
+                            >
+                              <CheckCircle className="h-3 w-3" />
+                              Devolver
+                            </Button>
+                          )}
+                          {onViewDetails && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => onViewDetails(transaction)}
+                            >
+                              Ver detalles
+                            </Button>
+                          )}
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
-                            onClick={() => onMarkReturned(transaction.id)}
-                            className="gap-1"
+                            onClick={() => {
+                              if (window.confirm("¿Estás seguro de que quieres eliminar esta transacción?")) {
+                                onDeleteTransaction(transaction.id);
+                              }
+                            }}
+                            className="gap-1 text-red-500"
                           >
-                            <CheckCircle className="h-3 w-3" />
-                            Devolver
+                            <Trash2 className="h-3 w-3" />
+                            Eliminar
                           </Button>
-                        )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   )

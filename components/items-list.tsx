@@ -9,16 +9,21 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Edit, Package, Wrench, DollarSign, ArrowUpDown, Filter } from "lucide-react"
+import { Search, Edit, Package, Wrench, DollarSign, ArrowUpDown, Filter, Eye, History } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import AddItemForm from "./add-item-form"
-import type { Item, Transaction, AppSettings } from "@/app/page"
+import { Item, Transaction } from "@/src/types/inventory.types"
+import type { AppSettings } from "@/app/page"
 
 interface ItemsListProps {
   items: Item[]
   searchTerm: string
   onSearchChange: (term: string) => void
   onUpdateItem: (id: string, updates: Partial<Item>) => Promise<void>
-  onEditItem: (item: Item) => void
+  openEditDialog: (item: Item) => void
+  openViewDialog: (item: Item) => void
+  openTransactionDialog: (item: Item) => void
+  openHistoryDialog: (item: Item) => void
   transactions: Transaction[]
   lowStockThreshold: number
   settings: AppSettings
@@ -33,7 +38,10 @@ export default function ItemsList({
   searchTerm,
   onSearchChange,
   onUpdateItem,
-  onEditItem,
+  openEditDialog,
+  openViewDialog,
+  openTransactionDialog,
+  openHistoryDialog,
   transactions,
   lowStockThreshold,
   settings,
@@ -368,10 +376,60 @@ export default function ItemsList({
                     <TableCell className="text-center font-medium">{item.quantity}</TableCell>
                     <TableCell className="text-center">{item.cost ? `$${item.cost.toFixed(2)}` : "-"}</TableCell>
                     <TableCell className="text-center">{getStatusBadge(item)}</TableCell>
-                    <TableCell className="text-center">
-                      <Button variant="ghost" size="sm" onClick={() => onEditItem(item)} className="h-8 w-8 p-0">
-                        <Edit className="h-4 w-4" />
-                      </Button>
+                    <TableCell>
+                      <TooltipProvider>
+                        <div className="flex items-center gap-2">
+                          {/* Botón Ver Detalles */}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="sm" aria-label="Ver detalles" onClick={() => openViewDialog(item)} className="gap-1">
+                                <Eye className="h-4 w-4" />
+                                <span className="hidden lg:inline">Ver detalles</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Ver detalles completos</TooltipContent>
+                          </Tooltip>
+
+                          {/* Botón Editar */}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="sm" aria-label="Editar" onClick={() => openEditDialog(item)} className="gap-1">
+                                <Edit className="h-4 w-4" />
+                                <span className="hidden lg:inline">Editar</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Editar datos</TooltipContent>
+                          </Tooltip>
+
+                          {/* Botón Transacción */}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                aria-label="Nueva transacción"
+                                onClick={() => openTransactionDialog(item)}
+                                disabled={item.status === "dado_de_baja"}
+                              >
+                                <Package className="h-4 w-4" />
+                                <span className="hidden lg:inline">Transacción</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Nueva transacción</TooltipContent>
+                          </Tooltip>
+
+                          {/* Botón Historial */}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button variant="ghost" size="sm" aria-label="Ver historial" onClick={() => openHistoryDialog(item)} className="gap-1">
+                                <History className="h-4 w-4" />
+                                <span className="hidden lg:inline">Historial</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Ver historial</TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </TooltipProvider>
                     </TableCell>
                   </TableRow>
                 ))}

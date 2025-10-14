@@ -1,24 +1,28 @@
-"use client"
+'use client'
 
-import type React from "react"
-
-import { useState, useMemo } from "react"
+import React, { useState, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Edit, Package2, Package, ArrowUpDown, Filter, AlertTriangle } from "lucide-react"
+import { Search, Edit, Package2, Package, ArrowUpDown, Filter, AlertTriangle, Eye, History, Wrench, DollarSign, Trash2 } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import AddItemForm from "./add-item-form"
-import type { Item, Transaction, AppSettings } from "@/app/page"
+import { Item, Transaction } from "@/src/types/inventory.types"
+import type { AppSettings } from "@/app/page"
 
 interface SuppliesListProps {
   items: Item[]
   searchTerm: string
   onSearchChange: (term: string) => void
   onUpdateItem: (id: string, updates: Partial<Item>) => Promise<void>
+  onDeleteItem: (id: string) => Promise<void>
   onEditItem: (item: Item) => void
+  openViewDialog?: (item: Item) => void
+  openTransactionDialog?: (item: Item) => void
+  onViewHistory?: (item: Item) => void
   transactions: Transaction[]
   lowStockThreshold: number
   settings: AppSettings
@@ -35,7 +39,11 @@ export default function SuppliesList({
   searchTerm,
   onSearchChange,
   onUpdateItem,
+  onDeleteItem,
   onEditItem,
+  openViewDialog,
+  openTransactionDialog,
+  onViewHistory,
   transactions,
   lowStockThreshold,
   settings,
@@ -164,26 +172,27 @@ export default function SuppliesList({
   }
 
   const getStatusBadge = (item: Item) => {
-    switch (item.status) {
-      case "active":
-        return <Badge className="bg-green-100 text-green-800 border-green-300">Normal</Badge>
-      case "low-stock":
-        return (
-          <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300 animate-pulse">
-            <AlertTriangle className="h-3 w-3 mr-1" />
-            Stock Bajo
-          </Badge>
-        )
-      case "out-of-stock":
-        return (
-          <Badge className="bg-red-100 text-red-800 border-red-300">
-            <AlertTriangle className="h-3 w-3 mr-1" />
-            Sin Stock
-          </Badge>
-        )
-      default:
-        return <Badge variant="outline">Desconocido</Badge>
+    if (item.quantity === 0) {
+      return <Badge className="bg-red-100 text-red-800 border-red-300">Sin Stock</Badge>
+    } else if (item.quantity < lowStockThreshold) {
+      return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">Stock Bajo</Badge>
+    } else {
+      return <Badge className="bg-green-100 text-green-800 border-green-300">Disponible</Badge>
     }
+  }
+
+  const getTypeBadge = (type: string) => {
+    return type === "herramienta" ? (
+      <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
+        <Wrench className="h-3 w-3 mr-1" />
+        Herramienta
+      </Badge>
+    ) : (
+      <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
+        <Package className="h-3 w-3 mr-1" />
+        Insumo
+      </Badge>
+    )
   }
 
   const getConditionBadge = (condition: string) => {
@@ -201,23 +210,76 @@ export default function SuppliesList({
     )
   }
 
-  const SortButton = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
-    <Button variant="ghost" size="sm" className="h-auto p-0 font-medium" onClick={() => handleSort(field)}>
-      <span className="flex items-center gap-1">
-        {children}
-        <ArrowUpDown className="h-3 w-3" />
-      </span>
-    </Button>
-  )
+  const SortButton = ({ field, children, onSort }: { field: SortField; children: React.ReactNode; onSort: (field: SortField) => void }) => {
+    const handleClick = () => onSort(field)
+
+    return (
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        className="h-auto p-0 font-medium" 
+        onClick={handleClick}
+      >
+        <span className="flex items-center gap-1">
+          {children}
+          <ArrowUpDown className="h-3 w-3" />
+        </span>
+      </Button>
+    );
+  };
+
+  const MemoizedSortButton = React.memo(SortButton);
 
   return (
     <div className="space-y-6">
+      {/* Filtros y búsqueda */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="relative w-full md:w-1/3">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Buscar insumos..."
+            className="w-full pl-8"
+            value={searchTerm}
+            onChange={(e) => onSearchChange(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-[180px]">
+              <Filter className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Categoría" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las categorías</SelectItem>
+              {categories.map((category) => (
+                <SelectItem key={category} value={category}>
+                  {category}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[180px]">
+              <Filter className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Estado" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos los estados</SelectItem>
+              <SelectItem value="active">Disponible</SelectItem>
+              <SelectItem value="low-stock">Stock Bajo</SelectItem>
+              <SelectItem value="out-of-stock">Sin Stock</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       {/* Estadísticas */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Insumos</CardTitle>
-            <Package2 className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Total Artículos</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalSupplies}</div>
@@ -227,34 +289,34 @@ export default function SuppliesList({
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Disponibles</CardTitle>
-            <Package className="h-4 w-4 text-green-600" />
+            <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{stats.totalAvailable}</div>
-            <p className="text-xs text-muted-foreground">En pañol</p>
+            <div className="text-2xl font-bold">${(stats.totalValue || 0)}</div>
+            <p className="text-xs text-muted-foreground">Inventario completo</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">En Uso</CardTitle>
-            <Package className="h-4 w-4 text-orange-600" />
+            <CardTitle className="text-sm font-medium">Stock Bajo</CardTitle>
+            <Package className="h-4 w-4 text-yellow-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{stats.totalLoaned}</div>
-            <p className="text-xs text-muted-foreground">Prestados</p>
+            <div className="text-2xl font-bold text-yellow-600">{stats.lowStockItems}</div>
+            <p className="text-xs text-muted-foreground">Insumos por reponer</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Alertas</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-red-600" />
+            <CardTitle className="text-sm font-medium">Sin Stock</CardTitle>
+            <Package className="h-4 w-4 text-red-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{stats.lowStockItems + stats.outOfStockItems}</div>
-            <p className="text-xs text-muted-foreground">Requieren atención</p>
+            <div className="text-2xl font-bold text-red-600">{stats.outOfStockItems}</div>
+            <p className="text-xs text-muted-foreground">Artículos agotados</p>
           </CardContent>
         </Card>
       </div>
@@ -262,147 +324,154 @@ export default function SuppliesList({
       {/* Controles */}
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <Package2 className="h-5 w-5" />
-                Insumos ({filteredAndSortedSupplies.length})
-              </CardTitle>
-              <CardDescription>Gestiona los insumos y materiales consumibles</CardDescription>
+              <CardTitle>Insumos</CardTitle>
+              <CardDescription>Lista de insumos en el inventario</CardDescription>
             </div>
-            <AddItemForm onAddItem={onAddItem} settings={settings} defaultType="insumo" />
+            <div className="flex items-center gap-2">
+              <AddItemForm onAddItem={onAddItem} settings={settings} />
+            </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Búsqueda y Filtros */}
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar insumos..."
-                value={searchTerm}
-                onChange={(e) => onSearchChange(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-
-            <div className="flex gap-2">
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Categoría" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas las categorías</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="active">Normal</SelectItem>
-                  <SelectItem value="low-stock">Stock Bajo</SelectItem>
-                  <SelectItem value="out-of-stock">Sin Stock</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Tabla */}
+        <CardContent>
           <div className="rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>
-                    <SortButton field="name">Nombre</SortButton>
+                  <TableHead>Nombre</TableHead>
+                  <TableHead className="hidden md:table-cell">Tipo</TableHead>
+                  <TableHead className="hidden md:table-cell">Categoría</TableHead>
+                  <TableHead className="hidden md:table-cell">Marca</TableHead>
+                  <TableHead className="hidden md:table-cell">Condición</TableHead>
+                  <TableHead className="hidden md:table-cell">
+                    <MemoizedSortButton field="location" onSort={handleSort}>
+                      Ubicación
+                    </MemoizedSortButton>
                   </TableHead>
-                  <TableHead>
-                    <SortButton field="category">Categoría</SortButton>
-                  </TableHead>
-                  <TableHead>
-                    <SortButton field="brand">Marca</SortButton>
-                  </TableHead>
-                  <TableHead>
-                    <SortButton field="condition">Condición</SortButton>
-                  </TableHead>
-                  <TableHead>
-                    <SortButton field="location">Ubicación</SortButton>
-                  </TableHead>
-                  <TableHead className="text-center">
-                    <SortButton field="quantity">Total</SortButton>
-                  </TableHead>
-                  <TableHead className="text-center">
-                    <SortButton field="available">Disponible</SortButton>
-                  </TableHead>
-                  <TableHead className="text-center">
-                    <SortButton field="loaned">En Uso</SortButton>
-                  </TableHead>
-                  <TableHead className="text-center">Estado</TableHead>
-                  <TableHead className="text-center">Acciones</TableHead>
+                  <TableHead className="text-right">Cantidad</TableHead>
+                  <TableHead className="text-right">Costo</TableHead>
+                  <TableHead className="hidden md:table-cell">Estado</TableHead>
+                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredAndSortedSupplies.map((item) => {
-                  const availableQuantity = getAvailableQuantity(item)
-                  const loanedQuantity = getLoanedQuantity(item.id)
-
-                  return (
-                    <TableRow key={item.id} className="hover:bg-muted/50">
+                {filteredAndSortedSupplies.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={11} className="h-24 text-center">
+                      No se encontraron insumos que coincidan con los filtros.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredAndSortedSupplies.map((item) => (
+                    <TableRow key={item.id} className="group">
                       <TableCell className="font-medium">
-                        <div>
-                          <div className="font-medium">{item.name}</div>
-                          {item.description && (
-                            <div className="text-xs text-muted-foreground truncate max-w-[200px]">
-                              {item.description}
-                            </div>
-                          )}
+                        <div className="flex items-center gap-2">
+                          <span className="truncate max-w-[180px]">{item.name}</span>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {getTypeBadge(item.type)}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
                         <Badge variant="outline">{item.category}</Badge>
                       </TableCell>
-                      <TableCell>{item.brand || "-"}</TableCell>
-                      <TableCell>{getConditionBadge(item.condition)}</TableCell>
-                      <TableCell>{item.location || "-"}</TableCell>
-                      <TableCell className="text-center font-medium">{item.quantity}</TableCell>
-                      <TableCell className="text-center">
-                        <Badge
-                          variant={availableQuantity > 0 ? "default" : "secondary"}
-                          className={
-                            availableQuantity > 0
-                              ? "bg-green-100 text-green-800 border-green-300"
-                              : "bg-gray-100 text-gray-800 border-gray-300"
-                          }
-                        >
-                          {availableQuantity}
-                        </Badge>
+                      <TableCell className="hidden md:table-cell">
+                        {item.brand || '-'}
                       </TableCell>
-                      <TableCell className="text-center">
-                        {loanedQuantity > 0 ? (
-                          <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-300">
-                            {loanedQuantity}
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground">0</span>
-                        )}
+                      <TableCell className="hidden md:table-cell">
+                        {item.condition ? getConditionBadge(item.condition) : '-'}
                       </TableCell>
-                      <TableCell className="text-center">{getStatusBadge(item)}</TableCell>
-                      <TableCell className="text-center">
-                        <Button variant="ghost" size="sm" onClick={() => onEditItem(item)} className="h-8 w-8 p-0">
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                      <TableCell className="hidden md:table-cell">
+                        {item.location || 'No especificada'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex flex-col">
+                          <span>{item.quantity} unidades</span>
+                          <span className="text-xs text-muted-foreground">
+                            {getAvailableQuantity(item)} disponibles
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {item.cost ? `$${item.cost.toLocaleString('es-AR')}` : '-'}
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {getStatusBadge(item)}
+                      </TableCell>
+                      <TableCell>
+                        <TooltipProvider>
+                          <div className="flex items-center gap-2">
+                            {/* Botón Ver Detalles */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="sm" aria-label="Ver detalles" onClick={() => openViewDialog?.(item)} className="gap-1">
+                                  <Eye className="h-4 w-4" />
+                                  <span className="hidden lg:inline">Ver detalles</span>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Ver detalles completos</TooltipContent>
+                            </Tooltip>
+
+                            {/* Botón Editar */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="sm" aria-label="Editar" onClick={() => onEditItem(item)} className="gap-1">
+                                  <Edit className="h-4 w-4" />
+                                  <span className="hidden lg:inline">Editar</span>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Editar datos</TooltipContent>
+                            </Tooltip>
+
+                            {/* Botón Transacción */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  aria-label="Nueva transacción"
+                                  onClick={() => openTransactionDialog?.(item)}
+                                  disabled={item.quantity === 0}
+                                >
+                                  <Package className="h-4 w-4" />
+                                  <span className="hidden lg:inline">Transacción</span>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Nueva transacción</TooltipContent>
+                            </Tooltip>
+
+                            {/* Botón Historial */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="sm" aria-label="Ver historial" onClick={() => onViewHistory?.(item)} className="gap-1">
+                                  <History className="h-4 w-4" />
+                                  <span className="hidden lg:inline">Historial</span>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Ver historial</TooltipContent>
+                            </Tooltip>
+
+                            {/* Botón Eliminar */}
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="sm" aria-label="Eliminar" onClick={() => {
+                                  if (window.confirm("¿Estás seguro de que quieres eliminar este ítem?")) {
+                                    onDeleteItem(item.id);
+                                  }
+                                }} className="gap-1 text-red-500">
+                                  <Trash2 className="h-4 w-4" />
+                                  <span className="hidden lg:inline">Eliminar</span>
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Eliminar ítem</TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </TooltipProvider>
                       </TableCell>
                     </TableRow>
-                  )
-                })}
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
@@ -421,5 +490,5 @@ export default function SuppliesList({
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
