@@ -1,6 +1,6 @@
 [build]
-  command = "npm install && npm run build"
-  publish = "out"
+  command = "npm install -g pnpm && pnpm install --no-frozen-lockfile && pnpm run build"
+  publish = ".next"
   functions = ".netlify/functions"
 
 [build.environment]
