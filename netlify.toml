@@ -1,32 +1,15 @@
 [build]
-  command = "npm install -g pnpm@latest --force && pnpm install --no-frozen-lockfile && pnpm run build"
+  command = "npm install && npm run build"
   publish = ".next"
   functions = ".netlify/functions"
 
 [build.environment]
-  # Versiones de Node.js y npm
-  NODE_VERSION = "20.11.0"
-  NPM_VERSION = "10.2.4"
-  
-  # Configuración de entorno
+  NODE_VERSION = "20"
+  NPM_VERSION = "10"
   NODE_ENV = "production"
-  
-  # Configuración de npm
-  NPM_FLAGS = "--force --omit=dev --prefer-offline --no-audit --no-fund"
-  
-  # Configuración de Next.js
+  NPM_FLAGS = "--omit=dev --prefer-offline --no-audit --no-fund"
   NEXT_TELEMETRY_DISABLED = "1"
-  
-  # Desactivar el plugin de Next.js de Netlify (usamos export estático)
-  NETLIFY_NEXT_PLUGIN_SKIP = "true"
-  
-  # Configuración de Node.js
   NODE_OPTIONS = "--max_old_space_size=4096"
-  NPM_CONFIG_PRODUCTION = "false"
-  
-  # Configuración de pnpm
-  PNPM_HOME = "/opt/buildhome/.pnpm"
-  PATH = "$PNPM_HOME:$PATH"
 
 # Configuración de redirecciones para SPA
 [[redirects]]
