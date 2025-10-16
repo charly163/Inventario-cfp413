@@ -10,14 +10,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Edit, Package } from "lucide-react"
 import { toast } from "sonner"
-import type { Item } from "@/src/types/inventory.types"
-import { getCategories, getLocations, getSources, getConditions } from "@/src/lib/database"
+import type { Item } from "@/types/inventory.types"
+import { getCategories, getLocations, getSources, getConditions } from "@/lib/database"
 
 interface EditItemFormProps {
   item: Item

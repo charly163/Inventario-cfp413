@@ -13,7 +13,7 @@ import { Search, CheckCircle, Clock, AlertTriangle, CalendarIcon, User, Package,
 import { format, parseISO, isAfter } from "date-fns"
 import { es } from "date-fns/locale"
 import { toast } from "sonner"
-import { Transaction } from "@/src/types/inventory.types"
+import { Transaction } from "@/types/inventory.types"
 
 interface TransactionsListProps {
   transactions: Transaction[]

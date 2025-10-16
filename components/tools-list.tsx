@@ -11,7 +11,7 @@ import { Search, Edit, Package, Wrench, DollarSign, ArrowUpDown, Filter, Eye, Hi
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AddItemForm from "./add-item-form"
-import { Item, Transaction } from "@/src/types/inventory.types"
+import { Item, Transaction } from "@/types/inventory.types"
 import type { AppSettings } from "@/app/page"
 
 interface ToolsListProps {

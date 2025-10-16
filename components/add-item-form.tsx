@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   Dialog,
   DialogContent,
@@ -11,18 +12,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Package } from "lucide-react"
 import { toast } from "sonner"
-import { Item } from "@/src/types/inventory.types"
+import { Item } from "@/types/inventory.types"
 import { supabase } from "@/lib/supabase"
 import { getCategories, getLocations, getSources, getConditions } from "@/lib/database"
 
 interface AddItemFormProps {
-  onAddItem: (item: Omit<Item, "id">) => Promise<void>
+  onAddItem: (item: Omit<Item, "id" | "created_at" | "updated_at">) => Promise<void>
   defaultType?: "herramienta" | "insumo"
 }
 

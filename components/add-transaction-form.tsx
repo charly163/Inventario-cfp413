@@ -16,15 +16,14 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { CalendarIcon, Plus, User } from "lucide-react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { Item, Transaction } from "@/src/types/inventory.types"
+import { Item, Transaction } from "@/types/inventory.types"
 import type { AppSettings } from "@/app/page"
-import { getTeachers } from "@/src/lib/database"
+import { getTeachers } from "@/lib/database"
 
 interface AddTransactionFormProps {
   items: Item[]

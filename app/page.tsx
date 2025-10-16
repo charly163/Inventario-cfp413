@@ -13,13 +13,31 @@ import { es } from "date-fns/locale"
 import { 
   getItems, 
   getTransactions, 
-  deleteTransaction as deleteTransactionInDb,
-  addTransaction as createTransactionInDb,
   updateItem,
   addItem as createItemInDb,
-  deleteItem as deleteItemInDb,
-  updateTeacher
+  addTransaction as createTransactionInDb,
+  deleteTransaction as deleteTransactionInDb,
+  updateTeacher,
+  getCategories,
+  getLocations,
+  getSources,
+  getConditions,
+  deleteItem as deleteItemInDb
 } from "@/lib/database"
+
+// Alias para mantener la compatibilidad con el código existente
+const updateTransactionInDb = async (id: string, updates: any): Promise<void> => {
+  // Esta función no está disponible en database.ts, implementación temporal
+  console.warn('updateTransactionInDb no está implementado');
+}
+
+// Re-exportar las funciones con los nombres esperados
+export { 
+  getCategories,
+  getLocations,
+  getSources,
+  getConditions 
+} from "@/lib/database";
 
 // Types
 import { Item, Transaction } from "@/types/inventory.types"

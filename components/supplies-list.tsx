@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Edit, Package2, Package, ArrowUpDown, Filter, AlertTriangle, Eye, History, Wrench, DollarSign, Trash2 } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import AddItemForm from "./add-item-form"
-import { Item, Transaction } from "@/src/types/inventory.types"
+import { Item, Transaction } from "@/types/inventory.types"
 import type { AppSettings } from "@/app/page"
 
 interface SuppliesListProps {

@@ -10,7 +10,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import { Item } from "@/src/types/inventory.types"
+import { Item } from "@/types/inventory.types"
 
 interface ItemDetailsDialogProps {
     item: Item | null

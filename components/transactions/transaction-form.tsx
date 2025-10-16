@@ -5,15 +5,13 @@ import { es } from "date-fns/locale"
 import { Calendar as CalendarIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Calendar } from "@/components/ui/calendar"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Textarea } from "@/components/ui/textarea"
-import { Transaction, TransactionStatus, TransactionType } from "@/src/types/inventory.types"
-import { Item } from "@/src/types/inventory.types"
-import { getTeachers } from "@/src/lib/database"
+import { Transaction, TransactionStatus, TransactionType, Item } from "@/types/inventory.types"
+import { getTeachers } from "@/lib/database"
 
 interface TransactionFormProps {
   item?: Item

@@ -3,7 +3,7 @@ import { es } from "date-fns/locale"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Transaction, TransactionStatus, TransactionType } from "@/src/types/inventory.types"
+import { Transaction, TransactionStatus, TransactionType } from "@/types/inventory.types"
 
 interface TransactionDetailsDialogProps {
   transaction: Transaction | null

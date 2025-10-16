@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator"
 import { History, Calendar, User, Package, AlertCircle, CheckCircle, Clock } from "lucide-react"
 import { format, parseISO, isAfter } from "date-fns"
 import { es } from "date-fns/locale"
-import { Item, Transaction } from "@/src/types/inventory.types"
+import { Item, Transaction } from "@/types/inventory.types"
 
 interface ToolHistoryModalProps {
   item: Item | null

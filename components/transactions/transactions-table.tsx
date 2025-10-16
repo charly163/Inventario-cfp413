@@ -1,4 +1,4 @@
-import { Transaction, TransactionStatus, TransactionType } from "@/src/types/inventory.types"
+import { Transaction, TransactionStatus, TransactionType } from "@/types/inventory.types"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { Badge } from "@/components/ui/badge"

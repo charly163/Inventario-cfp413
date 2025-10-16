@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
-import { getConditions, addCondition, updateCondition, deleteCondition } from "@/src/lib/database";
+import { getConditions, addCondition, updateCondition, deleteCondition } from "@/lib/database";
 import { toast } from "sonner";
 import { Plus, Edit, Trash2 } from "lucide-react";
 
