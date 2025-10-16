@@ -7,7 +7,7 @@
   NODE_VERSION = "20"
   NPM_VERSION = "10"
   NODE_ENV = "production"
-  NPM_FLAGS = "--omit=dev --prefer-offline --no-audit --no-fund"
+  NPM_FLAGS = "--prefer-offline --no-audit --no-fund"
   NEXT_TELEMETRY_DISABLED = "1"
   NODE_OPTIONS = "--max_old_space_size=4096"
 
