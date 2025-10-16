@@ -17,16 +17,10 @@
     "NEXT_PUBLIC_SUPABASE_URL": "@supabase_url",
     "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase_anon_key"
   },
-  "build": {
-    "env": {
-      "NEXT_PUBLIC_SUPABASE_URL": "@supabase_url",
-      "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@supabase_anon_key"
-    },
-    "installCommand": "npm install",
-    "buildCommand": "npm run build",
-    "devCommand": "npm run dev",
-    "outputDirectory": ".next"
-  },
+  "installCommand": "npm install",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "outputDirectory": ".next",
   "functions": {
     "app/**/*.{js,ts,jsx,tsx}": {
       "maxDuration": 30
