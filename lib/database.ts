@@ -4,22 +4,8 @@ import sql from './db';
 import { AppSettings, DBSettings, Item, Transaction } from '../types/inventory.types';
 import { convertAppSettingsToDbSettings, convertDbSettingsToAppSettings } from './settings-utils';
 
-// Helper type for the raw settings from the database
-interface RawSettings {
-  id: string;
-  key: string;
-  value: any;
-  created_at: string;
-  updated_at: string;
-  categories?: string[];
-  locations?: string[];
-  teachers?: string[];
-  low_stock_threshold?: number;
-  default_loan_days?: number;
-  currency?: string;
-  notifications?: boolean;
-  auto_backup?: boolean;
-}
+// Log simple para ver si el módulo se carga en el servidor
+console.log("Database module initialized at", new Date().toISOString());
 
 // Obtener todos los profesores activos
 export const getTeachers = async (): Promise<any[]> => {
@@ -156,7 +142,7 @@ export const updateSettings = async (settings: AppSettings): Promise<boolean> =>
 export const getItems = async (): Promise<Item[]> => {
   try {
     const data = await sql`SELECT * FROM items ORDER BY name ASC`;
-    return Array.from(data) as unknown as Item[];
+    return Array.from(data) as any;
   } catch (error) {
     console.error('Error getting items:', error);
     return [];
@@ -181,7 +167,7 @@ export const addItem = async (item: any): Promise<Item | null> => {
       INSERT INTO items ${sql(payload, ...Object.keys(payload))}
       RETURNING *
     `;
-    return data as unknown as Item;
+    return data as any;
   } catch (error) {
     console.error('Error adding item:', error);
     return null;
@@ -228,7 +214,7 @@ export const getTransactions = async (): Promise<Transaction[]> => {
       ...tx,
       teacherName: tx.first_name ? `${tx.first_name} ${tx.last_name}` : tx.teacher_name,
       teacher_id: tx.teacher_id || undefined
-    })) as unknown as Transaction[];
+    })) as any;
   } catch (error) {
     console.error('Error getting transactions:', error);
     return [];
@@ -248,14 +234,13 @@ export const addTransaction = async (transaction: any): Promise<Transaction | nu
 
     // Remove client-side only aliases before insert
     const { teacherName, ...dbPayload } = payload;
-
     const columns = Object.keys(dbPayload).filter(key => dbPayload[key] !== undefined);
 
     const [data] = await sql`
       INSERT INTO transactions ${sql(dbPayload, ...columns)}
       RETURNING *
     `;
-    return data as unknown as Transaction;
+    return data as any;
   } catch (error) {
     console.error('Error adding transaction:', error);
     return null;
@@ -271,6 +256,8 @@ export const checkConnection = async (): Promise<boolean> => {
     return false;
   }
 };
+
+// ... Borrado de items, transacciones, etc (sin cambios en lógica pero con try/catch) ...
 
 export const deleteItem = async (id: string): Promise<boolean> => {
   try {
@@ -307,71 +294,166 @@ export const updateTeacher = async (id: string, updates: any): Promise<any | nul
   }
 };
 
-// Funciones auxiliares para categorías, ubicaciones, etc.
+// Funciones auxiliares para categorías, ubicaciones, etc. con try/catch robusto
 export const getCategories = async () => {
-  const data = await sql`SELECT * FROM categories ORDER BY name ASC`;
-  return Array.from(data);
+  try {
+    const data = await sql`SELECT * FROM categories ORDER BY name ASC`;
+    return Array.from(data);
+  } catch (error) {
+    console.error('Error getting categories:', error);
+    return [];
+  }
 };
+
 export const addCategory = async (name: string) => {
-  const [data] = await sql`INSERT INTO categories (name) VALUES (${name}) RETURNING *`;
-  return data;
+  try {
+    const [data] = await sql`INSERT INTO categories (name) VALUES (${name}) RETURNING *`;
+    return data;
+  } catch (error) {
+    console.error('Error adding category:', error);
+    return null;
+  }
 };
+
 export const updateCategory = async (id: string, name: string) => {
-  const [data] = await sql`UPDATE categories SET name = ${name} WHERE id = ${id} RETURNING *`;
-  return data;
+  try {
+    const [data] = await sql`UPDATE categories SET name = ${name} WHERE id = ${id} RETURNING *`;
+    return data;
+  } catch (error) {
+    console.error('Error updating category:', error);
+    return null;
+  }
 };
+
 export const deleteCategory = async (id: string) => {
-  await sql`DELETE FROM categories WHERE id = ${id}`;
-  return true;
+  try {
+    await sql`DELETE FROM categories WHERE id = ${id}`;
+    return true;
+  } catch (error) {
+    console.error('Error deleting category:', error);
+    return false;
+  }
 };
 
+// Funciones de ubicación
 export const getLocations = async () => {
-  const data = await sql`SELECT * FROM locations ORDER BY name ASC`;
-  return Array.from(data);
+  try {
+    const data = await sql`SELECT * FROM locations ORDER BY name ASC`;
+    return Array.from(data);
+  } catch (error) {
+    console.error('Error getting locations:', error);
+    return [];
+  }
 };
+
 export const addLocation = async (name: string) => {
-  const [data] = await sql`INSERT INTO locations (name) VALUES (${name}) RETURNING *`;
-  return data;
+  try {
+    const [data] = await sql`INSERT INTO locations (name) VALUES (${name}) RETURNING *`;
+    return data;
+  } catch (error) {
+    console.error('Error adding location:', error);
+    return null;
+  }
 };
+
 export const updateLocation = async (id: string, name: string) => {
-  const [data] = await sql`UPDATE locations SET name = ${name} WHERE id = ${id} RETURNING *`;
-  return data;
+  try {
+    const [data] = await sql`UPDATE locations SET name = ${name} WHERE id = ${id} RETURNING *`;
+    return data;
+  } catch (error) {
+    console.error('Error updating location:', error);
+    return null;
+  }
 };
+
 export const deleteLocation = async (id: string) => {
-  await sql`DELETE FROM locations WHERE id = ${id}`;
-  return true;
+  try {
+    await sql`DELETE FROM locations WHERE id = ${id}`;
+    return true;
+  } catch (error) {
+    console.error('Error deleting location:', error);
+    return false;
+  }
 };
 
+// Funciones de fuentes (sources)
 export const getSources = async () => {
-  const data = await sql`SELECT * FROM sources ORDER BY name ASC`;
-  return Array.from(data);
-};
-export const addSource = async (name: string) => {
-  const [data] = await sql`INSERT INTO sources (name) VALUES (${name}) RETURNING *`;
-  return data;
-};
-export const updateSource = async (id: string, name: string) => {
-  const [data] = await sql`UPDATE sources SET name = ${name} WHERE id = ${id} RETURNING *`;
-  return data;
-};
-export const deleteSource = async (id: string) => {
-  await sql`DELETE FROM sources WHERE id = ${id}`;
-  return true;
+  try {
+    const data = await sql`SELECT * FROM sources ORDER BY name ASC`;
+    return Array.from(data);
+  } catch (error) {
+    console.error('Error getting sources:', error);
+    return [];
+  }
 };
 
+export const addSource = async (name: string) => {
+  try {
+    const [data] = await sql`INSERT INTO sources (name) VALUES (${name}) RETURNING *`;
+    return data;
+  } catch (error) {
+    console.error('Error adding source:', error);
+    return null;
+  }
+};
+
+export const updateSource = async (id: string, name: string) => {
+  try {
+    const [data] = await sql`UPDATE sources SET name = ${name} WHERE id = ${id} RETURNING *`;
+    return data;
+  } catch (error) {
+    console.error('Error updating source:', error);
+    return null;
+  }
+};
+
+export const deleteSource = async (id: string) => {
+  try {
+    await sql`DELETE FROM sources WHERE id = ${id}`;
+    return true;
+  } catch (error) {
+    console.error('Error deleting source:', error);
+    return false;
+  }
+};
+
+// Funciones de condiciones (conditions)
 export const getConditions = async () => {
-  const data = await sql`SELECT * FROM conditions ORDER BY name ASC`;
-  return Array.from(data);
+  try {
+    const data = await sql`SELECT * FROM conditions ORDER BY name ASC`;
+    return Array.from(data);
+  } catch (error) {
+    console.error('Error getting conditions:', error);
+    return [];
+  }
 };
+
 export const addCondition = async (name: string) => {
-  const [data] = await sql`INSERT INTO conditions (name) VALUES (${name}) RETURNING *`;
-  return data;
+  try {
+    const [data] = await sql`INSERT INTO conditions (name) VALUES (${name}) RETURNING *`;
+    return data;
+  } catch (error) {
+    console.error('Error adding condition:', error);
+    return null;
+  }
 };
+
 export const updateCondition = async (id: string, name: string) => {
-  const [data] = await sql`UPDATE conditions SET name = ${name} WHERE id = ${id} RETURNING *`;
-  return data;
+  try {
+    const [data] = await sql`UPDATE conditions SET name = ${name} WHERE id = ${id} RETURNING *`;
+    return data;
+  } catch (error) {
+    console.error('Error updating condition:', error);
+    return null;
+  }
 };
+
 export const deleteCondition = async (id: string) => {
-  await sql`DELETE FROM conditions WHERE id = ${id}`;
-  return true;
+  try {
+    await sql`DELETE FROM conditions WHERE id = ${id}`;
+    return true;
+  } catch (error) {
+    console.error('Error deleting condition:', error);
+    return false;
+  }
 };

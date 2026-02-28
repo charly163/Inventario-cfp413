@@ -31,14 +31,6 @@ const updateTransactionInDb = async (id: string, updates: any): Promise<void> =>
   console.warn('updateTransactionInDb no está implementado');
 }
 
-// Re-exportar las funciones con los nombres esperados
-export {
-  getCategories,
-  getLocations,
-  getSources,
-  getConditions
-} from "@/lib/database";
-
 // Types
 import { Item, Transaction } from "@/types/inventory.types"
 
