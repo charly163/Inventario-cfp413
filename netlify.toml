@@ -9,12 +9,7 @@
   NEXT_TELEMETRY_DISABLED = "1"
   NODE_OPTIONS = "--max_old_space_size=4096"
 
-# Configuración de redirecciones para SPA
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
-  force = false
+# Next.js Runtime manejará las rutas automáticamente
 
 # Configuración de encabezados
 [[headers]]

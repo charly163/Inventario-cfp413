@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Package } from "lucide-react"
 import { toast } from "sonner"
 import { Item } from "@/types/inventory.types"
-import { supabase } from "@/lib/supabase"
+// import { supabase } from "@/lib/supabase"
 import { getCategories, getLocations, getSources, getConditions } from "@/lib/database"
 
 interface AddItemFormProps {
@@ -119,26 +119,10 @@ export function AddItemForm({ onAddItem, defaultType }: AddItemFormProps) {
     try {
       let imageUrl = null
 
-      // Subir la imagen si existe
+      // TODO: Implementar almacenamiento para Neon/Netlify (Cloudinary, AWS S3, etc.)
       if (image) {
-        const fileExt = image.name.split('.').pop()
-        const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`
-        const filePath = `items/${fileName}`
-
-        const { data: uploadData, error: uploadError } = await supabase
-          .storage
-          .from('items')
-          .upload(filePath, image)
-
-        if (uploadError) throw uploadError
-
-        // Obtener la URL pública de la imagen
-        const { data: { publicUrl } } = supabase
-          .storage
-          .from('items')
-          .getPublicUrl(filePath)
-
-        imageUrl = publicUrl
+        console.warn("La subida de imágenes no está disponible actualmente en Neon. Se requiere un proveedor de almacenamiento externo.");
+        toast.info("Aviso", { description: "La subida de imágenes estará disponible pronto. El item se creará sin imagen." });
       }
 
       const newItem: Omit<Item, 'id' | 'created_at' | 'updated_at'> = {
@@ -256,7 +240,7 @@ export function AddItemForm({ onAddItem, defaultType }: AddItemFormProps) {
                 required
               />
             </div>
-            
+
             <div>
               <Label htmlFor="location">Ubicación *</Label>
               <Select value={location} onValueChange={setLocation} required>
@@ -328,18 +312,18 @@ export function AddItemForm({ onAddItem, defaultType }: AddItemFormProps) {
 
             <div className="space-y-2">
               <Label htmlFor="image">Imagen</Label>
-              <Input 
-                id="image" 
-                type="file" 
-                accept="image/*" 
+              <Input
+                id="image"
+                type="file"
+                accept="image/*"
                 onChange={handleImageChange}
                 className="cursor-pointer"
               />
               {imagePreview && (
                 <div className="mt-2">
-                  <img 
-                    src={imagePreview} 
-                    alt="Vista previa" 
+                  <img
+                    src={imagePreview}
+                    alt="Vista previa"
                     className="h-20 w-20 object-cover rounded border"
                   />
                 </div>

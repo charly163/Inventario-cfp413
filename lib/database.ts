@@ -1,4 +1,6 @@
-import { supabase } from './supabase';
+"use server";
+
+import sql from './db';
 import { AppSettings, DBSettings, Item, Transaction } from '../types/inventory.types';
 import { convertAppSettingsToDbSettings, convertDbSettingsToAppSettings } from './settings-utils';
 
@@ -22,14 +24,12 @@ interface RawSettings {
 // Obtener todos los profesores activos
 export const getTeachers = async (): Promise<any[]> => {
   try {
-    const { data, error } = await supabase
-      .from('teachers')
-      .select('*')
-      .order('last_name', { ascending: true });
-
-    if (error) throw error;
-
-    return data || [];
+    const data = await sql`
+      SELECT * FROM teachers 
+      WHERE is_active = true 
+      ORDER BY last_name ASC
+    `;
+    return Array.from(data);
   } catch (error) {
     console.error('Error getting teachers:', error);
     return [];
@@ -37,16 +37,12 @@ export const getTeachers = async (): Promise<any[]> => {
 };
 
 // Agregar un nuevo profesor
-export const addTeacher = async (teacherData: Omit<any, 'id' | 'created_at' | 'updated_at'>): Promise<any | null> => {
+export const addTeacher = async (teacherData: any): Promise<any | null> => {
   try {
-    const { data, error } = await supabase
-      .from('teachers')
-      .insert([teacherData])
-      .select()
-      .single();
-
-    if (error) throw error;
-
+    const [data] = await sql`
+      INSERT INTO teachers ${sql(teacherData, 'first_name', 'last_name', 'is_active')}
+      RETURNING *
+    `;
     return data;
   } catch (error) {
     console.error('Error adding teacher:', error);
@@ -57,12 +53,11 @@ export const addTeacher = async (teacherData: Omit<any, 'id' | 'created_at' | 'u
 // Marcar un profesor como inactivo
 export const removeTeacher = async (id: string): Promise<boolean> => {
   try {
-    const { error } = await supabase
-      .from('teachers')
-      .update({ is_active: false })
-      .eq('id', id);
-
-    if (error) throw error;
+    await sql`
+      UPDATE teachers 
+      SET is_active = false 
+      WHERE id = ${id}
+    `;
     return true;
   } catch (error) {
     console.error('Error removing teacher:', error);
@@ -72,20 +67,17 @@ export const removeTeacher = async (id: string): Promise<boolean> => {
 
 export const getSettings = async (): Promise<AppSettings> => {
   try {
-    // Get settings by key
-    const { data, error } = await supabase
-      .from('settings')
-      .select('*')
-      .eq('key', 'configuracion_principal')
-      .single<RawSettings>();
+    const [data] = await sql`
+      SELECT * FROM settings 
+      WHERE key = 'configuracion_principal'
+      LIMIT 1
+    `;
 
-    if (error || !data) {
-      console.error('Error getting settings, using defaults:', error);
-      // Return default settings if no settings found
+    if (!data) {
+      console.log('No settings found, using defaults');
       return getDefaultAppSettings();
     }
 
-    // Map the raw data to DBSettings format
     const dbSettings: DBSettings = {
       id: data.id,
       created_at: data.created_at,
@@ -96,32 +88,19 @@ export const getSettings = async (): Promise<AppSettings> => {
       low_stock_threshold: data.low_stock_threshold || 5,
       default_loan_days: data.default_loan_days || 7,
       currency: data.currency || 'ARS',
-      notifications: data.notifications !== false, // Default to true if not set
+      notifications: data.notifications !== false,
       auto_backup: data.auto_backup || false,
-      language: 'es', // Default language
-      sources: ['COMPRA', 'DONACION', 'TRASLADO', 'OTRO'] // Default sources
+      language: 'es',
+      sources: ['COMPRA', 'DONACION', 'TRASLADO', 'OTRO']
     };
 
     return convertDbSettingsToAppSettings(dbSettings);
   } catch (error) {
     console.error('Error getting settings:', error);
-    // Return default settings in case of error
-    return {
-      lowStockThreshold: 10,
-      defaultLoanDays: 14,
-      autoBackup: false,
-      notifications: true,
-      currency: 'USD',
-      language: 'es',
-      categories: ['EQUIPAMIENTO', 'HERRAMIENTA', 'INSUMO', 'MOBILIARIO', 'OTROS', 'UTENSILIO DE COCINA'],
-      sources: ['COMPRA', 'DONACION', 'TRASLADO', 'OTRO'],
-      teachers: [],
-      locations: ['ALMACEN', 'AULA', 'OFICINA', 'TALLER']
-    };
+    return getDefaultAppSettings();
   }
 };
 
-// Helper function to get default app settings
 function getDefaultAppSettings(): AppSettings {
   return {
     lowStockThreshold: 5,
@@ -139,16 +118,7 @@ function getDefaultAppSettings(): AppSettings {
 
 export const updateSettings = async (settings: AppSettings): Promise<boolean> => {
   try {
-    // Convert to database format
     const dbSettings = convertAppSettingsToDbSettings(settings);
-
-    // Get the current settings to check if we need to update or insert
-    const { data: existingSettings } = await supabase
-      .from('settings')
-      .select('id')
-      .eq('key', 'configuracion_principal')
-      .single<{ id: string }>();
-
     const settingsData = {
       key: 'configuracion_principal',
       categories: dbSettings.categories,
@@ -162,28 +132,20 @@ export const updateSettings = async (settings: AppSettings): Promise<boolean> =>
       updated_at: new Date().toISOString()
     };
 
-    let error;
+    const [existing] = await sql`
+      SELECT id FROM settings WHERE key = 'configuracion_principal' LIMIT 1
+    `;
 
-    if (existingSettings?.id) {
-      // Update existing settings
-      const { error: updateError } = await supabase
-        .from('settings')
-        .update(settingsData)
-        .eq('id', existingSettings.id);
-      error = updateError;
+    if (existing) {
+      await sql`
+        UPDATE settings SET ${sql(settingsData, 'categories', 'locations', 'teachers', 'low_stock_threshold', 'default_loan_days', 'currency', 'notifications', 'auto_backup', 'updated_at')}
+        WHERE id = ${existing.id}
+      `;
     } else {
-      // Insert new settings
-      const { error: insertError } = await supabase
-        .from('settings')
-        .insert([{
-          ...settingsData,
-          created_at: new Date().toISOString(),
-          value: {}
-        }]);
-      error = insertError;
+      await sql`
+        INSERT INTO settings ${sql({ ...settingsData, created_at: new Date().toISOString() }, 'key', 'categories', 'locations', 'teachers', 'low_stock_threshold', 'default_loan_days', 'currency', 'notifications', 'auto_backup', 'updated_at', 'created_at')}
+      `;
     }
-
-    if (error) throw error;
     return true;
   } catch (error) {
     console.error('Error updating settings:', error);
@@ -193,70 +155,58 @@ export const updateSettings = async (settings: AppSettings): Promise<boolean> =>
 
 export const getItems = async (): Promise<Item[]> => {
   try {
-    console.log('Obteniendo elementos de la base de datos...');
-    const { data, error, count } = await supabase
-      .from('items')
-      .select('*', { count: 'exact' });
-
-    console.log('Resultado de la consulta a Supabase:', { data, error, count });
-    
-    if (error) {
-      console.error('Error al obtener elementos:', error);
-      throw error;
-    }
-    
-    console.log(`Se encontraron ${data?.length || 0} elementos en la base de datos`);
-    return (data || []) as Item[];
+    const data = await sql`SELECT * FROM items ORDER BY name ASC`;
+    return Array.from(data) as unknown as Item[];
   } catch (error) {
     console.error('Error getting items:', error);
     return [];
   }
 };
 
-export const addItem = async (item: Omit<Item, 'id' | 'created_at' | 'updated_at'>): Promise<Item | null> => {
+export const addItem = async (item: any): Promise<Item | null> => {
   try {
-    const payload: any = {
-      ...item,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
+    const columns = [
+      'name', 'category', 'quantity', 'source', 'cost', 'acquisition_date',
+      'description', 'status', 'image', 'type', 'brand', 'condition', 'location'
+    ];
 
-    const { data, error } = await supabase
-      .from('items')
-      .insert([payload])
-      .select()
-      .single();
+    const payload: any = {};
+    columns.forEach(col => {
+      if (item[col] !== undefined) payload[col] = item[col];
+    });
+    payload.created_at = new Date().toISOString();
+    payload.updated_at = new Date().toISOString();
 
-    if (error) throw error;
-    return data as Item;
+    const [data] = await sql`
+      INSERT INTO items ${sql(payload, ...Object.keys(payload))}
+      RETURNING *
+    `;
+    return data as unknown as Item;
   } catch (error) {
     console.error('Error adding item:', error);
     return null;
   }
 };
 
-export const updateItem = async (id: string, updates: Partial<Item>): Promise<boolean> => {
+export const updateItem = async (id: string, updates: any): Promise<boolean> => {
   try {
-    const payload: { [key: string]: any } = { updated_at: new Date().toISOString() };
-
-    // List of valid columns in the 'items' table
     const validColumns = [
       'name', 'category', 'quantity', 'source', 'cost', 'acquisition_date',
       'description', 'status', 'image', 'type', 'brand', 'condition', 'location'
     ];
 
-    for (const key in updates) {
-      if (validColumns.includes(key)) {
+    const payload: any = {};
+    for (const key of validColumns) {
+      if (key in updates) {
         payload[key] = (updates as any)[key];
       }
     }
+    payload.updated_at = new Date().toISOString();
 
-    const { error } = await supabase
-      .from('items')
-      .update(payload)
-      .eq('id', id);
-
-    if (error) throw error;
+    await sql`
+      UPDATE items SET ${sql(payload, ...Object.keys(payload))}
+      WHERE id = ${id}
+    `;
     return true;
   } catch (error) {
     console.error('Error updating item:', error);
@@ -264,61 +214,48 @@ export const updateItem = async (id: string, updates: Partial<Item>): Promise<bo
   }
 };
 
-// Obtener transacciones con información del profesor
 export const getTransactions = async (): Promise<Transaction[]> => {
   try {
-    const { data, error } = await supabase
-      .from('transactions')
-      .select(`
-        *,
-        teacher:teachers (id, first_name, last_name)
-      `)
-      .order('created_at', { ascending: false });
+    const data = await sql`
+      SELECT t.*, 
+             tr.first_name, tr.last_name
+      FROM transactions t
+      LEFT JOIN teachers tr ON t.teacher_id = tr.id
+      ORDER BY t.created_at DESC
+    `;
 
-    if (error) throw error;
-
-    // Mapear los datos para incluir el nombre del profesor
-    return (data || []).map(tx => ({
+    return Array.from(data).map(tx => ({
       ...tx,
-      teacherName: tx.teacher ? `${tx.teacher.first_name} ${tx.teacher.last_name}` : '',
+      teacherName: tx.first_name ? `${tx.first_name} ${tx.last_name}` : tx.teacher_name,
       teacher_id: tx.teacher_id || undefined
-    }));
+    })) as unknown as Transaction[];
   } catch (error) {
     console.error('Error getting transactions:', error);
     return [];
   }
 };
 
-// Agregar una nueva transacción
-export const addTransaction = async (transaction: Omit<Transaction, 'id' | 'created_at' | 'updated_at'> & { teacher_id?: string }): Promise<Transaction | null> => {
+export const addTransaction = async (transaction: any): Promise<Transaction | null> => {
   try {
-    // Si tenemos teacherName pero no teacher_id, intentamos encontrarlo
-    if (transaction.teacherName && !transaction.teacher_id) {
-      const { data: teacher } = await supabase
-        .from('teachers')
-        .select('id')
-        .or(`first_name.ilike.${transaction.teacherName}%,last_name.ilike.%${transaction.teacherName}%`)
-        .eq('is_active', true)
-        .single();
+    const payload = {
+      ...transaction,
+      teacher_id: transaction.teacher_id || null,
+      status: transaction.status || 'activo',
+      date: transaction.date || new Date().toISOString().split('T')[0],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
 
-      if (teacher) {
-        transaction.teacher_id = teacher.id;
-      }
-    }
+    // Remove client-side only aliases before insert
+    const { teacherName, ...dbPayload } = payload;
 
-    const { data, error } = await supabase
-      .from('transactions')
-      .insert([{
-        ...transaction,
-        teacher_id: transaction.teacher_id || null,
-        status: 'activo',
-        date: new Date().toISOString().split('T')[0],
-      }])
-      .select()
-      .single();
+    const columns = Object.keys(dbPayload).filter(key => dbPayload[key] !== undefined);
 
-    if (error) throw error;
-    return data;
+    const [data] = await sql`
+      INSERT INTO transactions ${sql(dbPayload, ...columns)}
+      RETURNING *
+    `;
+    return data as unknown as Transaction;
   } catch (error) {
     console.error('Error adding transaction:', error);
     return null;
@@ -327,12 +264,8 @@ export const addTransaction = async (transaction: Omit<Transaction, 'id' | 'crea
 
 export const checkConnection = async (): Promise<boolean> => {
   try {
-    const { data, error } = await supabase
-      .from('items')
-      .select('*')
-      .limit(1);
-
-    return !error;
+    await sql`SELECT 1`;
+    return true;
   } catch (error) {
     console.error('Error checking database connection:', error);
     return false;
@@ -341,12 +274,7 @@ export const checkConnection = async (): Promise<boolean> => {
 
 export const deleteItem = async (id: string): Promise<boolean> => {
   try {
-    const { error } = await supabase
-      .from('items')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
+    await sql`DELETE FROM items WHERE id = ${id}`;
     return true;
   } catch (error) {
     console.error('Error deleting item:', error);
@@ -356,48 +284,22 @@ export const deleteItem = async (id: string): Promise<boolean> => {
 
 export const deleteTransaction = async (id: string): Promise<boolean> => {
   try {
-    if (!id) {
-      console.error('Error: No se proporcionó un ID de transacción');
-      return false;
-    }
-    
-    console.log(`Eliminando transacción con ID: ${id}`);
-    
-    // Intentar eliminar directamente sin verificación previa
-    const { error: deleteError, count } = await supabase
-      .from('transactions')
-      .delete({ count: 'exact' })
-      .eq('id', id);
-
-    if (deleteError) {
-      console.error('Error al eliminar la transacción:', deleteError);
-      return false;
-    }
-    
-    if (count === 0) {
-      console.warn(`No se encontró ninguna transacción con ID: ${id}`);
-      return false;
-    }
-    
-    console.log(`Transacción ${id} eliminada correctamente`);
-    return true;
+    const result = await sql`DELETE FROM transactions WHERE id = ${id} RETURNING id`;
+    return result.length > 0;
   } catch (error) {
-    console.error('Error inesperado al eliminar transacción:', error);
+    console.error('Error deleting transaction:', error);
     return false;
   }
 };
 
-export const updateTeacher = async (id: string, updates: Partial<any>): Promise<any | null> => {
+export const updateTeacher = async (id: string, updates: any): Promise<any | null> => {
   try {
-    const { data, error } = await supabase
-      .from('teachers')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
+    const columns = Object.keys(updates).filter(k => updates[k] !== undefined);
+    const [data] = await sql`
+      UPDATE teachers SET ${sql(updates, ...columns)}, updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING *
+    `;
     return data;
   } catch (error) {
     console.error('Error updating teacher:', error);
@@ -405,266 +307,71 @@ export const updateTeacher = async (id: string, updates: Partial<any>): Promise<
   }
 };
 
-export const getCategories = async (): Promise<any[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('categories')
-      .select('*')
-      .order('name', { ascending: true });
-
-    if (error) throw error;
-
-    return data || [];
-  } catch (error) {
-    console.error('Error getting categories:', error);
-    return [];
-  }
+// Funciones auxiliares para categorías, ubicaciones, etc.
+export const getCategories = async () => {
+  const data = await sql`SELECT * FROM categories ORDER BY name ASC`;
+  return Array.from(data);
+};
+export const addCategory = async (name: string) => {
+  const [data] = await sql`INSERT INTO categories (name) VALUES (${name}) RETURNING *`;
+  return data;
+};
+export const updateCategory = async (id: string, name: string) => {
+  const [data] = await sql`UPDATE categories SET name = ${name} WHERE id = ${id} RETURNING *`;
+  return data;
+};
+export const deleteCategory = async (id: string) => {
+  await sql`DELETE FROM categories WHERE id = ${id}`;
+  return true;
 };
 
-export const addCategory = async (name: string): Promise<any | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('categories')
-      .insert([{ name }])
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return data;
-  } catch (error) {
-    console.error('Error adding category:', error);
-    return null;
-  }
+export const getLocations = async () => {
+  const data = await sql`SELECT * FROM locations ORDER BY name ASC`;
+  return Array.from(data);
+};
+export const addLocation = async (name: string) => {
+  const [data] = await sql`INSERT INTO locations (name) VALUES (${name}) RETURNING *`;
+  return data;
+};
+export const updateLocation = async (id: string, name: string) => {
+  const [data] = await sql`UPDATE locations SET name = ${name} WHERE id = ${id} RETURNING *`;
+  return data;
+};
+export const deleteLocation = async (id: string) => {
+  await sql`DELETE FROM locations WHERE id = ${id}`;
+  return true;
 };
 
-export const updateCategory = async (id: string, name: string): Promise<any | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('categories')
-      .update({ name })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return data;
-  } catch (error) {
-    console.error('Error updating category:', error);
-    return null;
-  }
+export const getSources = async () => {
+  const data = await sql`SELECT * FROM sources ORDER BY name ASC`;
+  return Array.from(data);
+};
+export const addSource = async (name: string) => {
+  const [data] = await sql`INSERT INTO sources (name) VALUES (${name}) RETURNING *`;
+  return data;
+};
+export const updateSource = async (id: string, name: string) => {
+  const [data] = await sql`UPDATE sources SET name = ${name} WHERE id = ${id} RETURNING *`;
+  return data;
+};
+export const deleteSource = async (id: string) => {
+  await sql`DELETE FROM sources WHERE id = ${id}`;
+  return true;
 };
 
-export const deleteCategory = async (id: string): Promise<boolean> => {
-  try {
-    const { error } = await supabase
-      .from('categories')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error deleting category:', error);
-    return false;
-  }
+export const getConditions = async () => {
+  const data = await sql`SELECT * FROM conditions ORDER BY name ASC`;
+  return Array.from(data);
 };
-
-export const getLocations = async (): Promise<any[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('locations')
-      .select('*')
-      .order('name', { ascending: true });
-
-    if (error) throw error;
-
-    return data || [];
-  } catch (error) {
-    console.error('Error getting locations:', error);
-    return [];
-  }
+export const addCondition = async (name: string) => {
+  const [data] = await sql`INSERT INTO conditions (name) VALUES (${name}) RETURNING *`;
+  return data;
 };
-
-export const addLocation = async (name: string): Promise<any | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('locations')
-      .insert([{ name }])
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return data;
-  } catch (error) {
-    console.error('Error adding location:', error);
-    return null;
-  }
+export const updateCondition = async (id: string, name: string) => {
+  const [data] = await sql`UPDATE conditions SET name = ${name} WHERE id = ${id} RETURNING *`;
+  return data;
 };
-
-export const updateLocation = async (id: string, name: string): Promise<any | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('locations')
-      .update({ name })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return data;
-  } catch (error) {
-    console.error('Error updating location:', error);
-    return null;
-  }
-};
-
-export const deleteLocation = async (id: string): Promise<boolean> => {
-  try {
-    const { error } = await supabase
-      .from('locations')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error deleting location:', error);
-    return false;
-  }
-};
-
-export const getSources = async (): Promise<any[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('sources')
-      .select('*')
-      .order('name', { ascending: true });
-
-    if (error) throw error;
-
-    return data || [];
-  } catch (error) {
-    console.error('Error getting sources:', error);
-    return [];
-  }
-};
-
-export const addSource = async (name: string): Promise<any | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('sources')
-      .insert([{ name }])
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return data;
-  } catch (error) {
-    console.error('Error adding source:', error);
-    return null;
-  }
-};
-
-export const updateSource = async (id: string, name: string): Promise<any | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('sources')
-      .update({ name })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return data;
-  } catch (error) {
-    console.error('Error updating source:', error);
-    return null;
-  }
-};
-
-export const deleteSource = async (id: string): Promise<boolean> => {
-  try {
-    const { error } = await supabase
-      .from('sources')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error deleting source:', error);
-    return false;
-  }
-};
-
-export const getConditions = async (): Promise<any[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('conditions')
-      .select('*')
-      .order('name', { ascending: true });
-
-    if (error) throw error;
-
-    return data || [];
-  } catch (error) {
-    console.error('Error getting conditions:', error);
-    return [];
-  }
-};
-
-export const addCondition = async (name: string): Promise<any | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('conditions')
-      .insert([{ name }])
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return data;
-  } catch (error) {
-    console.error('Error adding condition:', error);
-    return null;
-  }
-};
-
-export const updateCondition = async (id: string, name: string): Promise<any | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('conditions')
-      .update({ name })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return data;
-  } catch (error) {
-    console.error('Error updating condition:', error);
-    return null;
-  }
-};
-
-export const deleteCondition = async (id: string): Promise<boolean> => {
-  try {
-    const { error } = await supabase
-      .from('conditions')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-    return true;
-  } catch (error) {
-    console.error('Error deleting condition:', error);
-    return false;
-  }
+export const deleteCondition = async (id: string) => {
+  await sql`DELETE FROM conditions WHERE id = ${id}`;
+  return true;
 };

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabase"
+// import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -10,9 +10,9 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 
 // Database functions
-import { 
-  getItems, 
-  getTransactions, 
+import {
+  getItems,
+  getTransactions,
   updateItem,
   addItem as createItemInDb,
   addTransaction as createTransactionInDb,
@@ -32,11 +32,11 @@ const updateTransactionInDb = async (id: string, updates: any): Promise<void> =>
 }
 
 // Re-exportar las funciones con los nombres esperados
-export { 
+export {
   getCategories,
   getLocations,
   getSources,
-  getConditions 
+  getConditions
 } from "@/lib/database";
 
 // Types
@@ -83,21 +83,21 @@ export default function Home() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("inventario");
-  
+
   // Estados para la gestión de ítems
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  
+
   // Estados para la gestión de transacciones
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isTransactionDetailsOpen, setIsTransactionDetailsOpen] = useState(false);
   const [isTransactionOpen, setIsTransactionOpen] = useState(false);
   const [isSubmittingTx, setIsSubmittingTx] = useState(false);
-  
+
   // Estados para los modales
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
-  
+
   // Configuración de la aplicación
   const [settings, setSettings] = useState<AppSettings>({
     lowStockThreshold: 5,
@@ -107,7 +107,7 @@ export default function Home() {
     locations: [],
     transactionTypes: []
   });
-  
+
   // Cargar transacciones desde la base de datos
   const loadTransactions = async () => {
     try {
@@ -130,7 +130,7 @@ export default function Home() {
         // Cargar items
         const itemsData = await getItems();
         setItems(itemsData);
-        
+
         // Cargar transacciones
         await loadTransactions();
       } catch (error) {
@@ -140,7 +140,7 @@ export default function Home() {
         setLoading(false);
       }
     };
-    
+
     loadInitialData();
   }, [])
 
@@ -160,20 +160,20 @@ export default function Home() {
       console.error(e)
       toast.error("No se pudo guardar en la base. Se agregó localmente.")
       const id = Math.random().toString(36).substring(2, 9)
-        const itemWithId: Item = { 
-          ...newItem, 
-          id, 
-          is_active: true, 
-          is_loanable: true, 
-          status: "active", 
-          created_at: new Date().toISOString(), 
-          updated_at: new Date().toISOString(),
-          // Ensure required fields have default values
-          category: newItem.category || "Otro",
-          acquisition_date: newItem.acquisition_date || new Date().toISOString().split('T')[0],
-          condition: newItem.condition || "nuevo",
-          location: newItem.location || "Almacén"
-        }
+      const itemWithId: Item = {
+        ...newItem,
+        id,
+        is_active: true,
+        is_loanable: true,
+        status: "active",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        // Ensure required fields have default values
+        category: newItem.category || "Otro",
+        acquisition_date: newItem.acquisition_date || new Date().toISOString().split('T')[0],
+        condition: newItem.condition || "nuevo",
+        location: newItem.location || "Almacén"
+      }
       setItems([...items, itemWithId])
     }
     return Promise.resolve()
@@ -226,31 +226,15 @@ export default function Home() {
     }
   };
 
-  // Función para eliminar una transacción
-  const deleteTransaction = async (id: string): Promise<boolean> => {
-    try {
-      const { error } = await supabase
-        .from('transactions')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      return true;
-    } catch (error) {
-      console.error('Error al eliminar transacción:', error);
-      return false;
-    }
-  };
-
   // Función para manejar la eliminación de una transacción
   const handleDeleteTransaction = async (id: string) => {
     if (!id) {
       toast.error("ID de transacción no válido");
       return;
     }
-    
+
     try {
-      const ok = await deleteTransaction(id);
+      const ok = await deleteTransactionInDb(id);
       if (ok) {
         setTransactions(transactions.filter(tx => tx.id !== id));
         toast.success("Transacción eliminada correctamente");
@@ -350,7 +334,7 @@ export default function Home() {
   const handleSubmitTransaction = async (formData: TransactionFormData) => {
     try {
       setIsSubmittingTx(true);
-      
+
       // Map form data to transaction
       const transaction: Omit<Transaction, 'id' | 'created_at' | 'updated_at'> = {
         item_id: formData.itemId,

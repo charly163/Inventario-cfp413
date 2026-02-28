@@ -1,39 +1,33 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Configuración para exportación estática
-  output: 'export',
-  
   // Configuración de imágenes
   images: {
-    unoptimized: true, // Necesario para exportaciones estáticas
+    unoptimized: true,
     domains: ['placeholder.com', 'via.placeholder.com'],
   },
-  
-  // Configuración de TypeScript y ESLint
+
+  // Configuración de TypeScript y ESLint para ignorar errores en build
   typescript: {
     ignoreBuildErrors: true,
   },
   eslint: {
     ignoreDuringBuilds: true,
   },
-  
-  // Deshabilitar la generación de mapas de fuente
-  productionBrowserSourceMaps: false,
-  
-  // Configuración de logging
-  logging: {
-    fetches: {
-      fullUrl: true,
-    },
+
+  // Habilitar Server Actions (Next.js 14+)
+  // Nota: En Next dev, esto suele estar habilitado por defecto, 
+  // pero lo aseguramos para producción en Netlify si es necesario.
+  experimental: {
+    serverActions: true,
   },
-  
-  // Variables de entorno
+
+  // Variables de entorno para el cliente si fueran necesarias
+  // (Actualmente no necesitamos Supabase en el cliente)
   env: {
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+    NEXT_PUBLIC_APP_VERSION: '1.1.0-neon',
   },
-  
-  // Configuración de redirecciones (solo para rutas estáticas)
+
+  // Configuración de redirecciones para Netlify (si no se usa netlify.toml)
   async redirects() {
     return [
       {
@@ -49,35 +43,6 @@ const nextConfig = {
       },
     ];
   },
-  
-  // Configuración de encabezados (solo para rutas estáticas)
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
-          },
-          {
-            key: 'X-Frame-Options',
-            value: 'DENY',
-          },
-          {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block',
-          },
-        ],
-      },
-    ];
-  },
-}
-
-// Solo incluir configuraciones de redirecciones y encabezados si no es una exportación estática
-if (process.env.NEXT_PHASE !== 'phase-production-build') {
-  delete nextConfig.redirects;
-  delete nextConfig.headers;
 }
 
 export default nextConfig
