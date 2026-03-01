@@ -9,8 +9,8 @@ export async function GET() {
         return NextResponse.json({
             status: 'connected',
             time: result[0].moment,
-            env_db_url_set: !!process.env.DATABASE_URL,
-            env_db_url_length: process.env.DATABASE_URL?.length || 0,
+            env_db_url_set: !!(process.env.DATABASE_URL || process.env.NETLIFY_DATABASE_URL),
+            using_prefixed_var: !!process.env.NETLIFY_DATABASE_URL,
             available_env_vars: Object.keys(process.env).filter(k => !k.includes('SECRET') && !k.includes('KEY') && !k.includes('TOKEN'))
         });
     } catch (e: any) {

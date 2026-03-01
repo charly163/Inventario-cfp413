@@ -1,10 +1,10 @@
 import postgres from 'postgres';
 
-// Usar el pooler de Neon optimizado para serverless
-const databaseUrl = process.env.DATABASE_URL;
+// Soporte para prefijos automáticos de Netlify o nombres estándar
+const databaseUrl = process.env.DATABASE_URL || process.env.NETLIFY_DATABASE_URL;
 
 if (!databaseUrl) {
-  console.error('CRITICAL: DATABASE_URL is not defined in environment variables');
+  console.error('CRITICAL: DATABASE_URL or NETLIFY_DATABASE_URL is not defined');
 }
 
 // En serverless (Netlify Functions), es mejor mantener el pool pequeño (max: 1)
