@@ -95,7 +95,7 @@ export default function ReportsSection({ items, transactions, disposals }: Repor
       if (!monthlyData[month]) {
         monthlyData[month] = { loans: 0, donations: 0 }
       }
-      if (transaction.type === "loan") {
+      if (transaction.type === "prestamo") {
         monthlyData[month].loans += transaction.quantity
       } else {
         monthlyData[month].donations += transaction.quantity
@@ -113,8 +113,8 @@ export default function ReportsSection({ items, transactions, disposals }: Repor
   const stats = useMemo(() => {
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0)
     const totalValue = items.reduce((sum, item) => sum + (item.cost || 0) * item.quantity, 0)
-    const activeLoans = transactions.filter((t) => t.status === "active" && t.type === "loan").length
-    const overdueLoans = transactions.filter((t) => t.status === "overdue").length
+    const activeLoans = transactions.filter((t) => t.status === "activo" && t.type === "prestamo").length
+    const overdueLoans = transactions.filter((t) => t.status === "vencido").length
     const lowStockItems = items.filter((item) => item.status === "low-stock").length
     const outOfStockItems = items.filter((item) => item.status === "out-of-stock").length
 
@@ -162,7 +162,7 @@ export default function ReportsSection({ items, transactions, disposals }: Repor
       Condición: item.condition,
       Ubicación: item.location || "",
       Costo: item.cost || 0,
-      "Fecha Adquisición": item.acquisitionDate,
+      "Fecha Adquisición": item.acquisition_date,
       Fuente: item.source,
     }))
 
@@ -174,7 +174,7 @@ export default function ReportsSection({ items, transactions, disposals }: Repor
       Artículo: transaction.itemName,
       Profesor: transaction.teacherName,
       Cantidad: transaction.quantity,
-      Tipo: transaction.type === "loan" ? "Préstamo" : "Donación",
+      Tipo: transaction.type === "prestamo" ? "Préstamo" : "Donación",
       Fecha: transaction.date,
       "Fecha Devolución": transaction.returnDate || "",
       Estado: transaction.status,
@@ -463,8 +463,8 @@ export default function ReportsSection({ items, transactions, disposals }: Repor
                       <TableCell className="font-medium">{transaction.itemName}</TableCell>
                       <TableCell>{transaction.teacherName}</TableCell>
                       <TableCell>
-                        <Badge variant={transaction.type === "loan" ? "default" : "secondary"}>
-                          {transaction.type === "loan" ? "Préstamo" : "Donación"}
+                        <Badge variant={transaction.type === "prestamo" ? "default" : "secondary"}>
+                          {transaction.type === "prestamo" ? "Préstamo" : "Donación"}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">{transaction.quantity}</TableCell>
@@ -475,16 +475,16 @@ export default function ReportsSection({ items, transactions, disposals }: Repor
                       <TableCell className="text-center">
                         <Badge
                           variant={
-                            transaction.status === "active"
+                            transaction.status === "activo"
                               ? "default"
-                              : transaction.status === "returned"
+                              : transaction.status === "completado"
                                 ? "secondary"
                                 : "destructive"
                           }
                         >
-                          {transaction.status === "active"
+                          {transaction.status === "activo"
                             ? "Activo"
-                            : transaction.status === "returned"
+                            : transaction.status === "completado"
                               ? "Devuelto"
                               : "Vencido"}
                         </Badge>
