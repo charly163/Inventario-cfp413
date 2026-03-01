@@ -1,5 +1,4 @@
-import { DBSettings } from '../types/database.types';
-import { AppSettings } from '../types/inventory.types';
+import { DBSettings, AppSettings } from '../types/inventory.types';
 
 export function convertDbSettingsToAppSettings(dbSettings: DBSettings): AppSettings {
   return {
