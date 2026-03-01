@@ -26,7 +26,7 @@ import { FileText, Download, CalendarIcon, TrendingUp, Package, Users, AlertTria
 import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
 import { toast } from "sonner"
-import type { Item, Transaction, Disposal } from "@/app/page"
+import type { Item, Transaction, Disposal } from "@/types/inventory.types"
 
 interface ReportsSectionProps {
   items: Item[]
@@ -48,14 +48,14 @@ export default function ReportsSection({ items, transactions, disposals }: Repor
   const filteredTransactions = useMemo(() => {
     return transactions.filter((transaction) => {
       const transactionDate = parseISO(transaction.date)
-      return isWithinInterval(transactionDate, dateRange)
+      return isWithinInterval(transactionDate, { start: dateRange.from, end: dateRange.to })
     })
   }, [transactions, dateRange])
 
   const filteredDisposals = useMemo(() => {
     return disposals.filter((disposal) => {
       const disposalDate = parseISO(disposal.date)
-      return isWithinInterval(disposalDate, dateRange)
+      return isWithinInterval(disposalDate, { start: dateRange.from, end: dateRange.to })
     })
   }, [disposals, dateRange])
 
@@ -269,7 +269,7 @@ export default function ReportsSection({ items, transactions, disposals }: Repor
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">${stats.totalValue.toFixed(2)}</div>
+                <div className="text-2xl font-bold">${Number(stats.totalValue).toFixed(2)}</div>
                 <p className="text-xs text-muted-foreground">Valor del inventario</p>
               </CardContent>
             </Card>
@@ -313,7 +313,7 @@ export default function ReportsSection({ items, transactions, disposals }: Repor
                       cx="50%"
                       cy="50%"
                       labelLine={false}
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="value"
@@ -423,7 +423,7 @@ export default function ReportsSection({ items, transactions, disposals }: Repor
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
-                        {item.cost ? `$${(item.cost * item.quantity).toFixed(2)}` : "-"}
+                        {item.cost ? `$${(Number(item.cost) * Number(item.quantity)).toFixed(2)}` : "-"}
                       </TableCell>
                     </TableRow>
                   ))}

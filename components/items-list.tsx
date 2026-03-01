@@ -226,7 +226,7 @@ export default function ItemsList({
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${stats.totalValue.toFixed(2)}</div>
+            <div className="text-2xl font-bold">${Number(stats.totalValue).toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">Inventario completo</p>
           </CardContent>
         </Card>
@@ -374,7 +374,7 @@ export default function ItemsList({
                     <TableCell>{getConditionBadge(item.condition)}</TableCell>
                     <TableCell>{item.location || "-"}</TableCell>
                     <TableCell className="text-center font-medium">{item.quantity}</TableCell>
-                    <TableCell className="text-center">{item.cost ? `$${item.cost.toFixed(2)}` : "-"}</TableCell>
+                    <TableCell className="text-center">{typeof item.cost === 'number' ? `$${item.cost.toFixed(2)}` : (item.cost ? `$${Number(item.cost).toFixed(2)}` : "-")}</TableCell>
                     <TableCell className="text-center">{getStatusBadge(item)}</TableCell>
                     <TableCell>
                       <TooltipProvider>

@@ -142,7 +142,11 @@ export const updateSettings = async (settings: AppSettings): Promise<boolean> =>
 export const getItems = async (): Promise<Item[]> => {
   try {
     const data = await sql`SELECT * FROM items ORDER BY name ASC`;
-    return Array.from(data) as any;
+    return Array.from(data).map(item => ({
+      ...item,
+      cost: item.cost ? Number(item.cost) : null,
+      quantity: item.quantity ? Number(item.quantity) : 0
+    })) as any;
   } catch (error) {
     console.error('Error getting items:', error);
     return [];
@@ -167,7 +171,11 @@ export const addItem = async (item: any): Promise<Item | null> => {
       INSERT INTO items ${sql(payload, ...Object.keys(payload))}
       RETURNING *
     `;
-    return data as any;
+    return {
+      ...data,
+      cost: data.cost ? Number(data.cost) : null,
+      quantity: data.quantity ? Number(data.quantity) : 0
+    } as any;
   } catch (error) {
     console.error('Error adding item:', error);
     return null;
@@ -189,9 +197,10 @@ export const updateItem = async (id: string, updates: any): Promise<boolean> => 
     }
     payload.updated_at = new Date().toISOString();
 
-    await sql`
+    const [data] = await sql`
       UPDATE items SET ${sql(payload, ...Object.keys(payload))}
       WHERE id = ${id}
+      RETURNING *
     `;
     return true;
   } catch (error) {
@@ -212,6 +221,7 @@ export const getTransactions = async (): Promise<Transaction[]> => {
 
     return Array.from(data).map(tx => ({
       ...tx,
+      quantity: Number(tx.quantity),
       teacherName: tx.first_name ? `${tx.first_name} ${tx.last_name}` : tx.teacher_name,
       teacher_id: tx.teacher_id || undefined
     })) as any;
