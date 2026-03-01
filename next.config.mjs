@@ -27,22 +27,6 @@ const nextConfig = {
     NEXT_PUBLIC_APP_VERSION: '1.1.0-neon',
   },
 
-  // Configuración de redirecciones para Netlify (si no se usa netlify.toml)
-  async redirects() {
-    return [
-      {
-        source: '/:path*',
-        has: [
-          {
-            type: 'host',
-            value: 'www.inventario-cfp413.netlify.app',
-          },
-        ],
-        destination: 'https://inventario-cfp413.netlify.app/:path*',
-        permanent: true,
-      },
-    ];
-  },
 }
 
 export default nextConfig
