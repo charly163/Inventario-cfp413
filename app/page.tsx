@@ -22,7 +22,9 @@ import {
   getLocations,
   getSources,
   getConditions,
-  deleteItem as deleteItemInDb
+  deleteItem as deleteItemInDb,
+  getSettings,
+  updateSettings
 } from "@/lib/database"
 
 // Alias para mantener la compatibilidad con el código existente
@@ -58,6 +60,7 @@ import CategoriesManager from "@/components/CategoriesManager"
 import LocationsManager from "@/components/LocationsManager"
 import SourcesManager from "@/components/SourcesManager"
 import ConditionsManager from "@/components/ConditionsManager"
+import SystemSettingsManager from "@/components/SystemSettingsManager"
 
 export interface AppSettings {
   lowStockThreshold: number
@@ -123,6 +126,10 @@ export default function Home() {
         const itemsData = await getItems();
         setItems(itemsData);
 
+        // Cargar settings
+        const settingsData = await getSettings();
+        setSettings(settingsData);
+
         // Cargar transacciones
         await loadTransactions();
       } catch (error) {
@@ -136,7 +143,18 @@ export default function Home() {
     loadInitialData();
   }, [])
 
-  const handleAddItem = async (newItem: Omit<Item, "id">) => {
+  const handleUpdateSettings = async (newSettings: AppSettings) => {
+    try {
+      const ok = await updateSettings(newSettings);
+      if (!ok) throw new Error("DB update failed");
+      setSettings(newSettings);
+    } catch (e) {
+      console.error("Error updating settings:", e);
+      throw e;
+    }
+  }
+
+  const handleAddItem = async (newItem: Omit<Item, "id" | "created_at" | "updated_at">) => {
     try {
       const saved = await createItemInDb(newItem as any)
       if (saved) {
@@ -334,11 +352,12 @@ export default function Home() {
         teacher_id: formData.teacherId || '',
         teacher_name: formData.teacherName || '',
         quantity: formData.quantity,
-        type: 'prestamo', // Default to 'prestamo' as per form
+        type: formData.type || 'prestamo',
         date: format(new Date(), 'yyyy-MM-dd'),
         return_date: formData.returnDate ? format(formData.returnDate, 'yyyy-MM-dd') : null,
-        status: 'activo',
+        status: formData.status || 'activo',
         notes: formData.notes || null,
+        course_name: formData.courseName || null,
       }
       await handleAddTransaction(transaction);
       setIsTransactionOpen(false);
@@ -399,7 +418,6 @@ export default function Home() {
             </Card>
           </TabsContent>
 
-// ...
           <TabsContent value="insumos">
             <Card>
               <CardHeader>
@@ -486,6 +504,7 @@ export default function Home() {
 
           <TabsContent value="config">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <SystemSettingsManager settings={settings} onUpdateSettings={handleUpdateSettings} />
               <TeachersManager />
               <CategoriesManager />
               <LocationsManager />

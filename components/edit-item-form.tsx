@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import {
   Dialog,
   DialogContent,
@@ -16,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Edit, Package } from "lucide-react"
 import { toast } from "sonner"
 import type { Item } from "@/types/inventory.types"
-import { getCategories, getLocations, getSources, getConditions } from "@/lib/database"
+import { getCategories, getLocations, getSources, getConditions, addCategory, addLocation, addSource, addCondition } from "@/lib/database"
 
 interface EditItemFormProps {
   item: Item
@@ -83,6 +84,24 @@ export default function EditItemForm({ item, onUpdateItem, onClose, lowStockThre
     setLoading(true)
 
     try {
+      // Auto-guardar nuevos valores si no existen en la BD
+      if (category && !categories.some(c => c.name.toLowerCase() === category.toLowerCase())) {
+        const newCat = await addCategory(category);
+        if (newCat) setCategories(prev => [...prev, newCat]);
+      }
+      if (location && !locations.some(l => l.name.toLowerCase() === location.toLowerCase())) {
+        const newLoc = await addLocation(location);
+        if (newLoc) setLocations(prev => [...prev, newLoc]);
+      }
+      if (source && !sources.some(s => s.name.toLowerCase() === source.toLowerCase())) {
+        const newSrc = await addSource(source);
+        if (newSrc) setSources(prev => [...prev, newSrc]);
+      }
+      if (condition && !conditions.some(c => c.name.toLowerCase() === condition.toLowerCase())) {
+        const newCond = await addCondition(condition);
+        if (newCond) setConditions(prev => [...prev, newCond]);
+      }
+
       // Determinar el estado basado en la cantidad y tipo
       let status: "active" | "low-stock" | "out-of-stock" = "active"
       if (quantityNum === 0) {
@@ -159,18 +178,19 @@ export default function EditItemForm({ item, onUpdateItem, onClose, lowStockThre
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="category">Categoría *</Label>
-              <Select value={category} onValueChange={setCategory} required>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.name}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                id="category"
+                list="categories-list"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                placeholder="Selecciona o escribe una categoría"
+                required
+              />
+              <datalist id="categories-list">
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.name} />
+                ))}
+              </datalist>
             </div>
 
             <div>
@@ -189,18 +209,18 @@ export default function EditItemForm({ item, onUpdateItem, onClose, lowStockThre
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="source">Fuente</Label>
-              <Select value={source} onValueChange={setSource} required>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona una fuente" />
-                </SelectTrigger>
-                <SelectContent>
-                  {sources.map((s) => (
-                    <SelectItem key={s.id} value={s.name}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                id="source"
+                list="sources-list"
+                value={source}
+                onChange={(e) => setSource(e.target.value)}
+                placeholder="Selecciona o escribe una fuente"
+              />
+              <datalist id="sources-list">
+                {sources.map((s) => (
+                  <option key={s.id} value={s.name} />
+                ))}
+              </datalist>
             </div>
 
             <div>
@@ -230,36 +250,36 @@ export default function EditItemForm({ item, onUpdateItem, onClose, lowStockThre
 
             <div>
               <Label htmlFor="condition">Condición</Label>
-              <Select value={condition} onValueChange={(value) => setCondition(value as any)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {conditions.map((c) => (
-                    <SelectItem key={c.id} value={c.name}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                id="condition"
+                list="conditions-list"
+                value={condition}
+                onChange={(e) => setCondition(e.target.value)}
+                placeholder="Ej. nuevo, usado"
+              />
+              <datalist id="conditions-list">
+                {conditions.map((c) => (
+                  <option key={c.id} value={c.name} />
+                ))}
+              </datalist>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="location">Ubicación</Label>
-              <Select value={location} onValueChange={setLocation}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona ubicación" />
-                </SelectTrigger>
-                <SelectContent>
-                  {locations.map((loc) => (
-                    <SelectItem key={loc.id} value={loc.name}>
-                      {loc.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Input
+                id="location"
+                list="locations-list"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="Selecciona o escribe una ubicación"
+              />
+              <datalist id="locations-list">
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.name} />
+                ))}
+              </datalist>
             </div>
 
             <div>

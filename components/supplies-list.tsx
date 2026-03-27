@@ -7,11 +7,13 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Edit, Package2, Package, ArrowUpDown, Filter, AlertTriangle, Eye, History, Wrench, DollarSign, Trash2 } from "lucide-react"
+import { Search, Edit, Package2, Package, ArrowUpDown, Filter, AlertTriangle, Eye, History, Wrench, DollarSign, Trash2, FileDown } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Label } from "@/components/ui/label"
 import AddItemForm from "./add-item-form"
 import { Item, Transaction } from "@/types/inventory.types"
 import type { AppSettings } from "@/app/page"
+import { generateInventoryPdf } from "@/lib/pdf-utils"
 
 interface SuppliesListProps {
   items: Item[]
@@ -26,7 +28,7 @@ interface SuppliesListProps {
   transactions: Transaction[]
   lowStockThreshold: number
   settings: AppSettings
-  onAddItem: (item: Omit<Item, "id">) => Promise<void>
+  onAddItem: (item: Omit<Item, "id" | "created_at" | "updated_at">) => Promise<void>
   getLoanedQuantity: (itemId: string) => number
   getAvailableQuantity: (item: Item) => number
 }
@@ -53,6 +55,9 @@ export default function SuppliesList({
 }: SuppliesListProps) {
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [conditionFilter, setConditionFilter] = useState<string>("all")
+  const [locationFilter, setLocationFilter] = useState<string>("all")
+  const [sourceFilter, setSourceFilter] = useState<string>("all")
   const [sortField, setSortField] = useState<SortField>("name")
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
 
@@ -69,8 +74,11 @@ export default function SuppliesList({
 
       const matchesCategory = categoryFilter === "all" || item.category === categoryFilter
       const matchesStatus = statusFilter === "all" || item.status === statusFilter
+      const matchesCondition = conditionFilter === "all" || item.condition === conditionFilter
+      const matchesLocation = locationFilter === "all" || item.location === locationFilter
+      const matchesSource = sourceFilter === "all" || (item as any).source === sourceFilter
 
-      return matchesSearch && matchesCategory && matchesStatus
+      return matchesSearch && matchesCategory && matchesStatus && matchesCondition && matchesLocation && matchesSource
     })
 
     // Ordenar
@@ -131,6 +139,9 @@ export default function SuppliesList({
     searchTerm,
     categoryFilter,
     statusFilter,
+    conditionFilter,
+    locationFilter,
+    sourceFilter,
     sortField,
     sortDirection,
     getLoanedQuantity,
@@ -156,10 +167,21 @@ export default function SuppliesList({
     }
   }, [items, getLoanedQuantity, getAvailableQuantity, lowStockThreshold])
 
-  // Obtener categorías únicas
   const categories = useMemo(() => {
     const uniqueCategories = [...new Set(items.map((item) => item.category))].sort()
     return uniqueCategories
+  }, [items])
+
+  const conditions = useMemo(() => {
+    return [...new Set(items.map(item => item.condition).filter(Boolean))].sort()
+  }, [items])
+
+  const locations = useMemo(() => {
+    return [...new Set(items.map(item => item.location).filter(Boolean))].sort()
+  }, [items])
+
+  const sources = useMemo(() => {
+    return [...new Set(items.map(item => (item as any).source).filter(Boolean))].sort()
   }, [items])
 
   const handleSort = (field: SortField) => {
@@ -244,33 +266,73 @@ export default function SuppliesList({
             onChange={(e) => onSearchChange(e.target.value)}
           />
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[180px]">
-              <Filter className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Categoría" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las categorías</SelectItem>
-              {categories.map((category) => (
-                <SelectItem key={category} value={category}>
-                  {category}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px]">
-              <Filter className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="active">Disponible</SelectItem>
-              <SelectItem value="low-stock">Stock Bajo</SelectItem>
-              <SelectItem value="out-of-stock">Sin Stock</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap gap-4 items-end">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Categoría</Label>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="Todas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las categorías</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Condición</Label>
+            <Select value={conditionFilter} onValueChange={setConditionFilter}>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Todas" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {conditions.map((c: any) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Ubicación</Label>
+            <Select value={locationFilter} onValueChange={setLocationFilter}>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Todas" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {locations.map((l: any) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Fuente</Label>
+            <Select value={sourceFilter} onValueChange={setSourceFilter}>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Todas" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {sources.map((s: any) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Estado</Label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los estados</SelectItem>
+                <SelectItem value="active">Disponible</SelectItem>
+                <SelectItem value="low-stock">Stock Bajo</SelectItem>
+                <SelectItem value="out-of-stock">Sin Stock</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
@@ -330,7 +392,15 @@ export default function SuppliesList({
               <CardDescription>Lista de insumos en el inventario</CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <AddItemForm onAddItem={onAddItem} settings={settings} />
+              <Button 
+                variant="outline" 
+                onClick={() => generateInventoryPdf(filteredAndSortedSupplies, "insumos")}
+                className="gap-2"
+              >
+                <FileDown className="h-4 w-4" />
+                <span>PDF Filtrado</span>
+              </Button>
+              <AddItemForm onAddItem={onAddItem} defaultType="insumo" />
             </div>
           </div>
         </CardHeader>

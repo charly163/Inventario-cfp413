@@ -9,11 +9,22 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Search, CheckCircle, Clock, AlertTriangle, CalendarIcon, User, Package, Edit, Filter, Trash2 } from "lucide-react"
+import { Search, CheckCircle, Clock, AlertTriangle, CalendarIcon, User, Package, Edit, Filter, Trash2, FileText } from "lucide-react"
 import { format, parseISO, isAfter } from "date-fns"
 import { es } from "date-fns/locale"
 import { toast } from "sonner"
 import { Transaction } from "@/types/inventory.types"
+import { generateLoanReceiptPdf } from "@/lib/pdf-utils"
+
+const parseDateSafe = (dateStr: any) => {
+  if (!dateStr) return null;
+  if (dateStr instanceof Date) return dateStr;
+  try {
+    return parseISO(dateStr);
+  } catch (e) {
+    return new Date(dateStr);
+  }
+}
 
 interface TransactionsListProps {
   transactions: Transaction[]
@@ -264,6 +275,7 @@ export default function TransactionsList({
                   <TableHead>Fecha</TableHead>
                   <TableHead>Devolución</TableHead>
                   <TableHead className="text-center">Estado</TableHead>
+                  <TableHead>Curso</TableHead>
                   <TableHead>Notas</TableHead>
                   <TableHead className="text-center">Acciones</TableHead>
                 </TableRow>
@@ -301,7 +313,10 @@ export default function TransactionsList({
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                          {transaction.date ? format(parseISO(transaction.date), "dd/MM/yyyy", { locale: es }) : ''}
+                          {(() => {
+                            const d = parseDateSafe(transaction.date);
+                            return d ? format(d, "dd/MM/yyyy", { locale: es }) : "";
+                          })()}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -336,7 +351,10 @@ export default function TransactionsList({
                             <div className="flex items-center gap-2">
                               <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                               <span className={isOverdue ? "text-red-600 font-medium" : ""}>
-                                {format(parseISO(returnDate), "dd/MM/yyyy", { locale: es })}
+                                {(() => {
+                                  const d = parseDateSafe(returnDate);
+                                  return d ? format(d, "dd/MM/yyyy", { locale: es }) : "-";
+                                })()}
                               </span>
                               {canMarkReturned && (
                                 <Button
@@ -355,6 +373,9 @@ export default function TransactionsList({
                         )}
                       </TableCell>
                       <TableCell className="text-center">{getStatusBadge(transaction)}</TableCell>
+                      <TableCell className="text-xs font-medium">
+                        {transaction.course_name || (transaction as any).courseName || "-"}
+                      </TableCell>
                       <TableCell>
                         {transaction.notes ? (
                           <span className="text-sm text-muted-foreground" title={transaction.notes}>
@@ -368,6 +389,17 @@ export default function TransactionsList({
                       </TableCell>
                       <TableCell className="text-center">
                         <div className="flex space-x-2 justify-center">
+                          {transaction.type === "prestamo" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => generateLoanReceiptPdf(transaction)}
+                              className="gap-1 border-blue-200 text-blue-700 hover:bg-blue-50"
+                            >
+                              <FileText className="h-3 w-3" />
+                              Comprobante
+                            </Button>
+                          )}
                           {canMarkReturned && (
                             <Button
                               variant="outline"

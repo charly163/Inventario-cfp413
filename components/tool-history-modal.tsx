@@ -18,6 +18,16 @@ interface ToolHistoryModalProps {
   onClose: () => void
 }
 
+const parseDateSafe = (dateStr: any) => {
+  if (!dateStr) return null;
+  if (dateStr instanceof Date) return dateStr;
+  try {
+    return parseISO(dateStr);
+  } catch (e) {
+    return new Date(dateStr);
+  }
+}
+
 export default function ToolHistoryModal({ item, transactions, isOpen, onClose }: ToolHistoryModalProps) {
   // Filtrar transacciones para este artículo
   const itemTransactions = useMemo(() => {
@@ -51,7 +61,7 @@ export default function ToolHistoryModal({ item, transactions, isOpen, onClose }
     // Préstamos vencidos (tipo 'prestamo' con estado 'vencido' o fecha de retorno pasada)
     const overdueLoans = loans.filter((t) => 
       t.status === 'vencido' || 
-      (t.return_date && isAfter(new Date(), parseISO(t.return_date)))
+      (t.return_date && isAfter(new Date(), parseDateSafe(t.return_date) || new Date()))
     )
 
     // Calcular cantidades totales
@@ -87,7 +97,9 @@ export default function ToolHistoryModal({ item, transactions, isOpen, onClose }
     // Para préstamos, mostrar el estado correspondiente
     if (transaction.type === 'prestamo') {
       // Verificar si está vencido
-      const isOverdue = transaction.return_date && isAfter(new Date(), parseISO(transaction.return_date))
+      const returnDateStr = transaction.return_date || transaction.returnDate;
+      const parsedReturnDate = parseDateSafe(returnDateStr);
+      const isOverdue = parsedReturnDate && isAfter(new Date(), parsedReturnDate)
       
       if (isOverdue || transaction.status === 'vencido') {
         return (
@@ -268,7 +280,10 @@ export default function ToolHistoryModal({ item, transactions, isOpen, onClose }
                           <TableCell>
                             <div className="flex items-center gap-2">
                               <Calendar className="h-4 w-4 text-muted-foreground" />
-                              {format(parseISO(transaction.date), "dd/MM/yyyy", { locale: es })}
+                              {(() => {
+                                const d = parseDateSafe(transaction.date);
+                                return d ? format(d, "dd/MM/yyyy", { locale: es }) : "-";
+                              })()}
                             </div>
                           </TableCell>
                           <TableCell>
@@ -278,8 +293,10 @@ export default function ToolHistoryModal({ item, transactions, isOpen, onClose }
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge variant={transaction.type === "loan" ? "default" : "secondary"}>
-                              {transaction.type === "loan" ? "Préstamo" : "Donación"}
+                            <Badge variant={transaction.type === "prestamo" ? "default" : "secondary"}>
+                              {transaction.type === "prestamo" ? "Préstamo" : 
+                               transaction.type === "entrada" ? "Donación" : 
+                               transaction.type === "devolucion" ? "Devolución" : "Otro"}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-center">
@@ -289,14 +306,18 @@ export default function ToolHistoryModal({ item, transactions, isOpen, onClose }
                             </div>
                           </TableCell>
                           <TableCell>
-                            {transaction.returnDate ? (
-                              <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-muted-foreground" />
-                                {format(parseISO(transaction.returnDate), "dd/MM/yyyy", { locale: es })}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
+                            {(() => {
+                              const returnDateStr = transaction.returnDate || transaction.return_date;
+                              const d = parseDateSafe(returnDateStr);
+                              return d ? (
+                                <div className="flex items-center gap-2">
+                                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                                  {format(d, "dd/MM/yyyy", { locale: es })}
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground">-</span>
+                              );
+                            })()}
                           </TableCell>
                           <TableCell className="text-center">{getStatusBadge(transaction)}</TableCell>
                           <TableCell>

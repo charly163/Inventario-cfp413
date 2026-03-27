@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, Edit, Package, Wrench, DollarSign, ArrowUpDown, Filter, Eye, History } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Label } from "@/components/ui/label"
 import AddItemForm from "./add-item-form"
 import { Item, Transaction } from "@/types/inventory.types"
 import type { AppSettings } from "@/app/page"
@@ -50,6 +51,9 @@ export default function ItemsList({
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [conditionFilter, setConditionFilter] = useState<string>("all")
+  const [locationFilter, setLocationFilter] = useState<string>("all")
+  const [sourceFilter, setSourceFilter] = useState<string>("all")
   const [sortField, setSortField] = useState<SortField>("name")
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
 
@@ -67,8 +71,11 @@ export default function ItemsList({
       const matchesType = typeFilter === "all" || item.type === typeFilter
       const matchesCategory = categoryFilter === "all" || item.category === categoryFilter
       const matchesStatus = statusFilter === "all" || item.status === statusFilter
+      const matchesCondition = conditionFilter === "all" || item.condition === conditionFilter
+      const matchesLocation = locationFilter === "all" || item.location === locationFilter
+      const matchesSource = sourceFilter === "all" || (item as any).source === sourceFilter
 
-      return matchesSearch && matchesType && matchesCategory && matchesStatus
+      return matchesSearch && matchesType && matchesCategory && matchesStatus && matchesCondition && matchesLocation && matchesSource
     })
 
     // Ordenar
@@ -120,7 +127,7 @@ export default function ItemsList({
     })
 
     return filtered
-  }, [items, searchTerm, typeFilter, categoryFilter, statusFilter, sortField, sortDirection])
+  }, [items, searchTerm, typeFilter, categoryFilter, statusFilter, conditionFilter, locationFilter, sourceFilter, sortField, sortDirection])
 
   // Estadísticas
   const stats = useMemo(() => {
@@ -144,6 +151,10 @@ export default function ItemsList({
     const uniqueCategories = [...new Set(items.map((item) => item.category))].sort()
     return uniqueCategories
   }, [items])
+
+  const conditions = useMemo(() => [...new Set(items.map(i => i.condition).filter(Boolean))].sort(), [items])
+  const locations = useMemo(() => [...new Set(items.map(i => i.location).filter(Boolean))].sort(), [items])
+  const sources = useMemo(() => [...new Set(items.map(i => (i as any).source).filter(Boolean))].sort(), [items])
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -265,7 +276,7 @@ export default function ItemsList({
               </CardTitle>
               <CardDescription>Gestiona todo el inventario del pañol</CardDescription>
             </div>
-            <AddItemForm onAddItem={onAddItem} settings={settings} />
+            <AddItemForm onAddItem={onAddItem} />
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -281,44 +292,98 @@ export default function ItemsList({
               />
             </div>
 
-            <div className="flex gap-2">
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-[140px]">
-                  <Filter className="h-4 w-4 mr-2" />
-                  <SelectValue placeholder="Tipo" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los tipos</SelectItem>
-                  <SelectItem value="herramienta">Herramientas</SelectItem>
-                  <SelectItem value="insumo">Insumos</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex flex-wrap gap-4 items-end">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Tipo</Label>
+                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                  <SelectTrigger className="w-[140px]">
+                    <Filter className="h-4 w-4 mr-2" />
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los tipos</SelectItem>
+                    <SelectItem value="herramienta">Herramientas</SelectItem>
+                    <SelectItem value="insumo">Insumos</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Categoría" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas las categorías</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Categoría</Label>
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger className="w-[160px]">
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {categories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="active">Activo</SelectItem>
-                  <SelectItem value="low-stock">Stock Bajo</SelectItem>
-                  <SelectItem value="out-of-stock">Sin Stock</SelectItem>
-                </SelectContent>
-              </Select>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Condición</Label>
+                <Select value={conditionFilter} onValueChange={setConditionFilter}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {conditions.map((c: any) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Ubicación</Label>
+                <Select value={locationFilter} onValueChange={setLocationFilter}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {locations.map((l: any) => (
+                      <SelectItem key={l} value={l}>{l}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Fuente</Label>
+                <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Todas" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas</SelectItem>
+                    {sources.map((s: any) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Estado</Label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Todos" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos</SelectItem>
+                    <SelectItem value="active">Activo</SelectItem>
+                    <SelectItem value="low-stock">Stock Bajo</SelectItem>
+                    <SelectItem value="out-of-stock">Sin Stock</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 

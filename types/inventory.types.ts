@@ -80,6 +80,7 @@ export interface Transaction {
   return_date: string | null;
   status: 'activo' | 'completado' | 'vencido';
   notes: string | null;
+  course_name?: string | null;
   created_at: string;
   updated_at: string;
   // Aliases for compatibility

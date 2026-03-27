@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
 import { Textarea } from "@/components/ui/textarea"
 import { Transaction, TransactionStatus, TransactionType, Item } from "@/types/inventory.types"
 import { getTeachers } from "@/lib/database"
@@ -32,6 +33,7 @@ export type TransactionFormData = {
   returnDate?: Date
   status: TransactionStatus
   notes?: string
+  courseName?: string
 }
 
 export function TransactionForm({ item, transaction, onSubmit, onCancel, isSubmitting }: TransactionFormProps) {
@@ -57,8 +59,9 @@ export function TransactionForm({ item, transaction, onSubmit, onCancel, isSubmi
       type: transaction?.type || 'loan',
       date: transaction?.date ? new Date(transaction.date) : new Date(),
       returnDate: transaction?.returnDate ? new Date(transaction.returnDate) : undefined,
-      status: transaction?.status || 'active',
-      notes: transaction?.notes || ''
+      status: transaction?.status || 'activo',
+      notes: transaction?.notes || '',
+      courseName: (transaction as any)?.course_name || ''
     }
   })
 
@@ -139,10 +142,10 @@ export function TransactionForm({ item, transaction, onSubmit, onCancel, isSubmi
             value={watchType}
             onValueChange={(value: TransactionType) => {
               setValue('type', value)
-              if (value === 'donation') {
-                setValue('status', 'returned')
+              if (value === 'entrada') {
+                setValue('status', 'completado')
               } else {
-                setValue('status', 'active')
+                setValue('status', 'activo')
               }
             }}
           >
@@ -150,8 +153,8 @@ export function TransactionForm({ item, transaction, onSubmit, onCancel, isSubmi
               <SelectValue placeholder="Seleccionar tipo" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="loan">Préstamo</SelectItem>
-              <SelectItem value="donation">Donación</SelectItem>
+              <SelectItem value="prestamo">Préstamo</SelectItem>
+              <SelectItem value="entrada">Donación</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -209,7 +212,7 @@ export function TransactionForm({ item, transaction, onSubmit, onCancel, isSubmi
           </Popover>
         </div>
 
-        {selectedType === 'loan' && (
+        {selectedType === 'prestamo' && (
           <div className="space-y-2">
             <Label>Fecha de Devolución</Label>
             <Popover>
@@ -253,13 +256,22 @@ export function TransactionForm({ item, transaction, onSubmit, onCancel, isSubmi
                 <SelectValue placeholder="Seleccionar estado" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="active">Activo</SelectItem>
-                <SelectItem value="returned">Devuelto</SelectItem>
-                <SelectItem value="overdue">Vencido</SelectItem>
+                <SelectItem value="activo">Activo</SelectItem>
+                <SelectItem value="completado">Devuelto</SelectItem>
+                <SelectItem value="vencido">Vencido</SelectItem>
               </SelectContent>
             </Select>
           </div>
         )}
+
+        <div className="space-y-2">
+          <Label htmlFor="courseName">Curso / Taller</Label>
+          <Input
+            id="courseName"
+            placeholder="Nombre del curso"
+            {...register('courseName')}
+          />
+        </div>
       </div>
 
       <div className="space-y-2">

@@ -7,12 +7,14 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Edit, Package, Wrench, DollarSign, ArrowUpDown, Filter, Eye, History, Hammer, Trash2 } from "lucide-react"
+import { Search, Edit, Package, Wrench, DollarSign, ArrowUpDown, Filter, Eye, History, Hammer, Trash2, FileDown } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Label } from "@/components/ui/label"
 import AddItemForm from "./add-item-form"
 import { Item, Transaction } from "@/types/inventory.types"
 import type { AppSettings } from "@/app/page"
+import { generateInventoryPdf } from "@/lib/pdf-utils"
 
 interface ToolsListProps {
   items: Item[]
@@ -27,7 +29,7 @@ interface ToolsListProps {
   transactions: Transaction[]
   lowStockThreshold: number
   settings: AppSettings
-  onAddItem: (item: Omit<Item, "id">) => Promise<void>
+  onAddItem: (item: Omit<Item, "id" | "created_at" | "updated_at">) => Promise<void>
   getLoanedQuantity: (itemId: string) => number
   getAvailableQuantity: (item: Item) => number
 }
@@ -56,6 +58,7 @@ const ToolsList: React.FC<ToolsListProps> = ({
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [conditionFilter, setConditionFilter] = useState<string>("all")
   const [locationFilter, setLocationFilter] = useState<string>("all")
+  const [sourceFilter, setSourceFilter] = useState<string>("all")
   const [sortField, setSortField] = useState<SortField>("name")
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
 
@@ -68,6 +71,11 @@ const ToolsList: React.FC<ToolsListProps> = ({
   const locations = useMemo(() => {
     const uniqueLocations = [...new Set(items.map(item => item.location).filter(Boolean))].sort()
     return uniqueLocations
+  }, [items])
+
+  const sources = useMemo(() => {
+    const uniqueSources = [...new Set(items.map(item => (item as any).source).filter(Boolean))].sort()
+    return uniqueSources
   }, [items])
 
   // Filtrar y ordenar herramientas
@@ -85,8 +93,9 @@ const ToolsList: React.FC<ToolsListProps> = ({
       const matchesStatus = statusFilter === "all" || item.status === statusFilter
       const matchesCondition = conditionFilter === "all" || item.condition === conditionFilter
       const matchesLocation = locationFilter === "all" || item.location === locationFilter
+      const matchesSource = sourceFilter === "all" || (item as any).source === sourceFilter
 
-      return matchesSearch && matchesCategory && matchesStatus && matchesCondition && matchesLocation
+      return matchesSearch && matchesCategory && matchesStatus && matchesCondition && matchesLocation && matchesSource
     })
 
     // Ordenar
@@ -149,6 +158,7 @@ const ToolsList: React.FC<ToolsListProps> = ({
     statusFilter,
     conditionFilter,
     locationFilter,
+    sourceFilter,
     sortField,
     sortDirection,
     getLoanedQuantity,
@@ -270,33 +280,73 @@ const ToolsList: React.FC<ToolsListProps> = ({
             onChange={(e) => onSearchChange(e.target.value)}
           />
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[180px]">
-              <Filter className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Categoría" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas las categorías</SelectItem>
-              {categories.map((category) => (
-                <SelectItem key={category} value={category}>
-                  {category}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px]">
-              <Filter className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Estado" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="active">Disponible</SelectItem>
-              <SelectItem value="low-stock">Stock Bajo</SelectItem>
-              <SelectItem value="out-of-stock">Sin Stock</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap gap-4 items-end">
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Categoría</Label>
+            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="Todas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas las categorías</SelectItem>
+                {categories.map((category) => (
+                  <SelectItem key={category} value={category}>
+                    {category}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Condición</Label>
+            <Select value={conditionFilter} onValueChange={setConditionFilter}>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Todas" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {conditions.map((c: any) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Ubicación</Label>
+            <Select value={locationFilter} onValueChange={setLocationFilter}>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Todas" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {locations.map((l: any) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Fuente</Label>
+            <Select value={sourceFilter} onValueChange={setSourceFilter}>
+              <SelectTrigger className="w-[140px]"><SelectValue placeholder="Todas" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {sources.map((s: any) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Estado</Label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[180px]">
+                <Filter className="mr-2 h-4 w-4" />
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los estados</SelectItem>
+                <SelectItem value="active">Disponible</SelectItem>
+                <SelectItem value="low-stock">Stock Bajo</SelectItem>
+                <SelectItem value="out-of-stock">Sin Stock</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
@@ -368,6 +418,14 @@ const ToolsList: React.FC<ToolsListProps> = ({
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                onClick={() => generateInventoryPdf(filteredAndSortedTools, "herramientas")}
+                className="gap-2"
+              >
+                <FileDown className="h-4 w-4" />
+                <span>PDF Filtrado</span>
+              </Button>
               <AddItemForm 
                 onAddItem={onAddItem} 
                 defaultType={items.some(item => item.type === 'herramienta') && !items.some(item => item.type === 'insumo') ? 'herramienta' : 'insumo'} 
