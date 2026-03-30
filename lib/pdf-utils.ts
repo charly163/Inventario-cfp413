@@ -4,6 +4,36 @@ import { Item, Transaction } from "@/types/inventory.types"
 import { format, parseISO } from "date-fns"
 import { es } from "date-fns/locale"
 
+const safeFormatDate = (date: any, formatStr: string = "dd/MM/yyyy"): string => {
+  if (!date) return "-"
+  
+  try {
+    // If it's already a Date object
+    if (date instanceof Date) {
+      return format(date, formatStr)
+    }
+    
+    // If it's a string, try to parse it
+    if (typeof date === "string") {
+      // Try parseISO first
+      const parsed = parseISO(date)
+      if (!isNaN(parsed.getTime())) {
+        return format(parsed, formatStr)
+      }
+      
+      // Fallback to new Date()
+      const fallback = new Date(date)
+      if (!isNaN(fallback.getTime())) {
+        return format(fallback, formatStr)
+      }
+    }
+  } catch (error) {
+    console.error("Error formatting date:", error, date)
+  }
+  
+  return "-"
+}
+
 export const generateInventoryPdf = (items: Item[], type: "herramientas" | "insumos") => {
   const doc = new jsPDF({
     orientation: "landscape",
@@ -50,7 +80,7 @@ export const generateInventoryPdf = (items: Item[], type: "herramientas" | "insu
       cost > 0 ? `$${cost.toLocaleString('es-AR')}` : "-",
       totalValue > 0 ? `$${totalValue.toLocaleString('es-AR')}` : "-",
       (item as any).source || "-",
-      item.acquisition_date ? format(new Date(item.acquisition_date), "dd/MM/yyyy") : "-",
+      item.acquisition_date ? safeFormatDate(item.acquisition_date) : "-",
       item.status === "active" ? "Activo" : item.status === "low-stock" ? "Stock Bajo" : "Sin Stock"
     ]
   })
@@ -117,13 +147,13 @@ export const generateLoanReceiptPdf = (transaction: Transaction) => {
     const rightColX = 120
     doc.text("Fecha:", rightColX, yOffset + 35)
     doc.setFont("helvetica", "normal")
-    doc.text(transaction.date ? format(parseISO(transaction.date), "dd/MM/yyyy") : "-", rightColX + 40, yOffset + 35)
+    doc.text(safeFormatDate(transaction.date), rightColX + 40, yOffset + 35)
     
     doc.setFont("helvetica", "bold")
     doc.text("Devolución prevista:", rightColX, yOffset + 42)
     doc.setFont("helvetica", "normal")
-    const retDate = transaction.return_date || (transaction as any).returnDate
-    doc.text(retDate ? format(parseISO(retDate), "dd/MM/yyyy") : "No aplica", rightColX + 40, yOffset + 42)
+    const retDate = transaction.return_date || (transaction as any).returnDate || (transaction as any).dueDate
+    doc.text(retDate ? safeFormatDate(retDate) : "No aplica", rightColX + 40, yOffset + 42)
 
     // Item Table
     autoTable(doc, {
