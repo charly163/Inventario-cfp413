@@ -119,7 +119,8 @@ export const generateLoanReceiptPdf = (transaction: Transaction) => {
     
     doc.setFontSize(12)
     doc.setTextColor(0)
-    doc.text("COMPROBANTE DE PRÉSTAMO / ENTREGA", pageWidth / 2, yOffset + 10, { align: "center" })
+    const receiptType = transaction.type === "prestamo" ? "PRÉSTAMO / ENTREGA" : "DONACIÓN / ENTREGA"
+    doc.text(`COMPROBANTE DE ${receiptType}`, pageWidth / 2, yOffset + 10, { align: "center" })
     doc.setFontSize(9)
     doc.text(`Copia: ${title}`, pageWidth - margin, yOffset + 10, { align: "right" })
 
@@ -129,7 +130,8 @@ export const generateLoanReceiptPdf = (transaction: Transaction) => {
 
     // Details Grid
     doc.setFontSize(10)
-    doc.text("DATOS DEL PRÉSTAMO", margin, yOffset + 25)
+    const detailsTitle = transaction.type === "prestamo" ? "DATOS DEL PRÉSTAMO" : "DATOS DE LA DONACIÓN"
+    doc.text(detailsTitle, margin, yOffset + 25)
     
     // Left Column
     doc.setFont("helvetica", "bold")

@@ -44,7 +44,7 @@ export default function TransactionsList({
   onDeleteTransaction,
 }: TransactionsListProps) {
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [statusFilter, setStatusFilter] = useState<string>("activo")
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [editingReturnDate, setEditingReturnDate] = useState<string | null>(null)
   const [newReturnDate, setNewReturnDate] = useState<Date>()
@@ -71,8 +71,10 @@ export default function TransactionsList({
     const overdueLoans = transactions.filter(
       (t) => {
         const returnDate = t.returnDate || t.return_date;
+        if (!returnDate) return t.status === "vencido";
+        const d = parseDateSafe(returnDate);
         return t.status === "vencido" ||
-        (t.status === "activo" && returnDate && isAfter(new Date(), parseISO(returnDate)))
+        (t.status === "activo" && d && isAfter(new Date(), d))
       },
     ).length
     const totalDonations = transactions.filter((t) => t.type === "entrada").length
@@ -98,7 +100,8 @@ export default function TransactionsList({
 
     // Verificar si está vencido
     const returnDate = transaction.returnDate || transaction.return_date;
-    const isOverdue = returnDate && isAfter(new Date(), parseISO(returnDate));
+    const d = parseDateSafe(returnDate);
+    const isOverdue = d && isAfter(new Date(), d);
 
     if (isOverdue && transaction.status === "activo") {
       return (
@@ -155,7 +158,8 @@ export default function TransactionsList({
   const startEditingReturnDate = (transaction: Transaction) => {
     setEditingReturnDate(transaction.id)
     const returnDate = transaction.returnDate || transaction.return_date;
-    setNewReturnDate(returnDate ? parseISO(returnDate) : new Date())
+    const d = parseDateSafe(returnDate);
+    setNewReturnDate(d || new Date())
   }
 
   const cancelEditingReturnDate = () => {
@@ -283,7 +287,8 @@ export default function TransactionsList({
               <TableBody>
                 {filteredTransactions.map((transaction) => {
                   const returnDate = transaction.returnDate || transaction.return_date;
-                  const isOverdue = returnDate && isAfter(new Date(), parseISO(returnDate));
+                  const d = parseDateSafe(returnDate);
+                  const isOverdue = d && isAfter(new Date(), d);
                   const canMarkReturned = transaction.type === "prestamo" && transaction.status === "activo"
                   const isEditingDate = editingReturnDate === transaction.id
 
@@ -389,7 +394,7 @@ export default function TransactionsList({
                       </TableCell>
                       <TableCell className="text-center">
                         <div className="flex space-x-2 justify-center">
-                          {transaction.type === "prestamo" && (
+                          {(transaction.type === "prestamo" || transaction.type === "entrada") && (
                             <Button
                               variant="outline"
                               size="sm"

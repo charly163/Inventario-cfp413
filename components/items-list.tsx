@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Edit, Package, Wrench, DollarSign, ArrowUpDown, Filter, Eye, History } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Label } from "@/components/ui/label"
+import { cn } from "@/lib/utils"
 import AddItemForm from "./add-item-form"
 import { Item, Transaction } from "@/types/inventory.types"
 import type { AppSettings } from "@/app/page"
@@ -28,7 +29,7 @@ interface ItemsListProps {
   transactions: Transaction[]
   lowStockThreshold: number
   settings: AppSettings
-  onAddItem: (item: Omit<Item, "id">) => Promise<void>
+  onAddItem: (item: Omit<Item, "id" | "created_at" | "updated_at">) => Promise<void>
 }
 
 type SortField = "name" | "category" | "quantity" | "type" | "brand" | "condition" | "location" | "cost"
@@ -56,6 +57,17 @@ export default function ItemsList({
   const [sourceFilter, setSourceFilter] = useState<string>("all")
   const [sortField, setSortField] = useState<SortField>("name")
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
+
+  // Funciones para calcular cantidades disponibles y prestadas
+  const getLoanedQuantity = (itemId: string): number => {
+    return transactions
+      .filter(t => (t.item_id || t.itemId) === itemId && t.status === "activo")
+      .reduce((total, t) => total + t.quantity, 0)
+  }
+
+  const getAvailableQuantity = (item: Item): number => {
+    return Math.max(0, item.quantity - getLoanedQuantity(item.id))
+  }
 
   // Filtrar y ordenar items
   const filteredAndSortedItems = useMemo(() => {
@@ -166,16 +178,33 @@ export default function ItemsList({
   }
 
   const getStatusBadge = (item: Item) => {
-    switch (item.status) {
-      case "active":
-        return <Badge className="bg-green-100 text-green-800 border-green-300">Activo</Badge>
-      case "low-stock":
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">Stock Bajo</Badge>
-      case "out-of-stock":
-        return <Badge className="bg-red-100 text-red-800 border-red-300">Sin Stock</Badge>
-      default:
-        return <Badge variant="outline">Desconocido</Badge>
+    const loaned = getLoanedQuantity(item.id)
+    const available = getAvailableQuantity(item)
+    
+    if (item.quantity === 0) {
+      if (transactions.some(t => (t.item_id === item.id || t.itemId === item.id) && t.type === 'salida')) {
+         return <Badge className="bg-slate-100 text-slate-800 border-slate-300">Fuera por Donación/Baja</Badge>
+      }
+      return <Badge className="bg-red-100 text-red-800 border-red-300">Sin Stock</Badge>
     }
+    
+    if (loaned > 0) {
+      if (available === 0) {
+        return <Badge className="bg-amber-100 text-amber-800 border-amber-300">Todo Prestado</Badge>
+      }
+      return (
+        <div className="flex flex-col gap-1 items-center">
+          <Badge className="bg-green-100 text-green-800 border-green-300 w-fit">Disponible</Badge>
+          <Badge className="bg-blue-100 text-blue-800 border-blue-300 w-fit">{loaned} Prestados</Badge>
+        </div>
+      )
+    }
+
+    if (item.quantity < lowStockThreshold && item.type === "insumo") {
+      return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">Stock Bajo</Badge>
+    }
+    
+    return <Badge className="bg-green-100 text-green-800 border-green-300">En Taller</Badge>
   }
 
   const getTypeBadge = (type: string) => {
@@ -438,7 +467,55 @@ export default function ItemsList({
                     <TableCell>{item.brand || "-"}</TableCell>
                     <TableCell>{getConditionBadge(item.condition)}</TableCell>
                     <TableCell>{item.location || "-"}</TableCell>
-                    <TableCell className="text-center font-medium">{item.quantity}</TableCell>
+                    <TableCell className="text-center">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex flex-col cursor-help items-center whitespace-nowrap">
+                              <span className="font-bold">{item.quantity} unidades</span>
+                              <span className={cn("text-[10px]", getAvailableQuantity(item) > 0 ? "text-green-600" : "text-red-500")}>
+                                {getAvailableQuantity(item)} en taller
+                              </span>
+                              {getLoanedQuantity(item.id) > 0 && (
+                                <span className="text-[10px] text-blue-600 font-medium">
+                                  {getLoanedQuantity(item.id)} prestados
+                                </span>
+                              )}
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="w-64">
+                            <div className="text-xs space-y-2 p-1">
+                              <p className="font-bold border-b pb-1">Distribución de {item.name}</p>
+                              <div className="grid grid-cols-2 gap-1 mb-2">
+                                <span>Stock Total:</span>
+                                <span className="font-medium text-right">{item.quantity}</span>
+                                <span className="text-green-600">En Taller:</span>
+                                <span className="font-medium text-right text-green-600">{getAvailableQuantity(item)}</span>
+                                <span className="text-blue-600">En Préstamo:</span>
+                                <span className="font-medium text-right text-blue-600">{getLoanedQuantity(item.id)}</span>
+                              </div>
+                              
+                              {getLoanedQuantity(item.id) > 0 && (
+                                <div className="mt-2 pt-2 border-t">
+                                  <p className="font-bold text-blue-700 mb-1">Responsables:</p>
+                                  <ul className="space-y-1">
+                                    {transactions
+                                      .filter(t => (t.item_id === item.id || t.itemId === item.id) && t.status === "activo" && t.type === "prestamo")
+                                      .map((t, idx) => (
+                                        <li key={idx} className="flex justify-between items-center bg-blue-50 p-1 rounded">
+                                          <span>{t.teacher_name || t.teacherName}</span>
+                                          <Badge variant="outline" className="h-4 text-[10px] px-1">{t.quantity}</Badge>
+                                        </li>
+                                      ))
+                                    }
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </TableCell>
                     <TableCell className="text-center">{typeof item.cost === 'number' ? `$${item.cost.toFixed(2)}` : (item.cost ? `$${Number(item.cost).toFixed(2)}` : "-")}</TableCell>
                     <TableCell className="text-center">{getStatusBadge(item)}</TableCell>
                     <TableCell>
@@ -474,7 +551,7 @@ export default function ItemsList({
                                 size="sm"
                                 aria-label="Nueva transacción"
                                 onClick={() => openTransactionDialog(item)}
-                                disabled={item.status === "dado_de_baja"}
+                                disabled={(item.status as any) === "dado_de_baja"}
                               >
                                 <Package className="h-4 w-4" />
                                 <span className="hidden lg:inline">Transacción</span>
