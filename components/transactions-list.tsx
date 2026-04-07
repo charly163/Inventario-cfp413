@@ -44,7 +44,7 @@ export default function TransactionsList({
   onDeleteTransaction,
 }: TransactionsListProps) {
   const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("activo")
+  const [statusFilter, setStatusFilter] = useState<string>("all")
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [editingReturnDate, setEditingReturnDate] = useState<string | null>(null)
   const [newReturnDate, setNewReturnDate] = useState<Date>()

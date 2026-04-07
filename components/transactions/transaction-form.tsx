@@ -38,7 +38,7 @@ export type TransactionFormData = {
 
 export function TransactionForm({ item, transaction, onSubmit, onCancel, isSubmitting }: TransactionFormProps) {
   const isEdit = !!transaction
-  const [selectedType, setSelectedType] = useState<TransactionType>(transaction?.type || 'loan')
+  const [selectedType, setSelectedType] = useState<TransactionType>(transaction?.type || 'prestamo')
   const [teachers, setTeachers] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
@@ -56,7 +56,7 @@ export function TransactionForm({ item, transaction, onSubmit, onCancel, isSubmi
       teacherId: (transaction as any)?.teacher_id || '',
       teacherName: transaction?.teacherName || '',
       quantity: transaction?.quantity || 1,
-      type: transaction?.type || 'loan',
+      type: transaction?.type || 'prestamo',
       date: transaction?.date ? new Date(transaction.date) : new Date(),
       returnDate: transaction?.returnDate ? new Date(transaction.returnDate) : undefined,
       status: transaction?.status || 'activo',
