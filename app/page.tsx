@@ -174,31 +174,10 @@ export default function Home() {
       if (saved) {
         setItems([...items, saved])
         toast.success(`Ítem ${saved.name} agregado correctamente`)
-      } else {
-        // fallback local si algo falla silenciosamente
-        const id = Math.random().toString(36).substring(2, 9)
-        const itemWithId: Item = { ...newItem, id, is_active: true, is_loanable: true, status: "active", created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
-        setItems([...items, itemWithId])
       }
     } catch (e) {
       console.error(e)
-      toast.error("No se pudo guardar en la base. Se agregó localmente.")
-      const id = Math.random().toString(36).substring(2, 9)
-      const itemWithId: Item = {
-        ...newItem,
-        id,
-        is_active: true,
-        is_loanable: true,
-        status: "active",
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        // Ensure required fields have default values
-        category: newItem.category || "Otro",
-        acquisition_date: newItem.acquisition_date || new Date().toISOString().split('T')[0],
-        condition: newItem.condition || "nuevo",
-        location: newItem.location || "Almacén"
-      }
-      setItems([...items, itemWithId])
+      toast.error(`Error al guardar: ${e instanceof Error ? e.message : 'Error de base de datos'}`)
     }
     return Promise.resolve()
   }
@@ -209,12 +188,11 @@ export default function Home() {
       if (newTransaction) {
         setTransactions([newTransaction, ...transactions]);
         toast.success("Transacción agregada correctamente");
-      } else {
-        throw new Error("Failed to create transaction in DB");
       }
     } catch (error) {
       console.error("Error adding transaction:", error);
-      toast.error("Error al agregar la transacción");
+      toast.error(`Error de base de datos: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      throw error;
     }
   }
 

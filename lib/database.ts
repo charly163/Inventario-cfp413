@@ -180,8 +180,8 @@ export const addItem = async (item: any): Promise<Item | null> => {
       quantity: data.quantity ? Number(data.quantity) : 0
     } as any;
   } catch (error) {
-    console.error('Error adding item:', error);
-    return null;
+    console.error('DATABASE ERROR adding item:', error);
+    throw error; // Re-lanzar para que el cliente sepa que falló
   }
 };
 
@@ -249,14 +249,18 @@ export const addTransaction = async (transaction: any): Promise<Transaction | nu
     const { teacherName, ...dbPayload } = payload;
     const columns = Object.keys(dbPayload).filter(key => dbPayload[key] !== undefined);
 
-    const [data] = await sql`
+    const finalQuery = sql`
       INSERT INTO transactions ${sql(dbPayload, ...columns)}
       RETURNING *
     `;
+    
+    const [data] = await finalQuery;
+    console.log('✅ Transaction saved successfully:', data.id);
     return data as any;
   } catch (error) {
-    console.error('Error adding transaction:', error);
-    return null;
+    console.error('❌ CRITICAL DATABASE ERROR adding transaction:');
+    console.error(JSON.stringify(error, null, 2));
+    throw error;
   }
 };
 
