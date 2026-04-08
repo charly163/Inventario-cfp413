@@ -357,7 +357,7 @@ export default function Home() {
       }
       await handleAddTransaction(transaction);
       setIsTransactionOpen(false);
-      toast.success("Transacción registrada correctamente");
+      // El mensaje de éxito ahora lo maneja handleAddTransaction solo si es exitoso
     } catch (error) {
       console.error('Error submitting transaction:', error);
       toast.error("Error al registrar la transacción");

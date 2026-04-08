@@ -245,57 +245,41 @@ export const getTransactions = async (): Promise<Transaction[]> => {
 
 export const addTransaction = async (transaction: any): Promise<Transaction | null> => {
   try {
-    const payload = {
-      ...transaction,
-      teacher_id: transaction.teacher_id || null,
-      status: transaction.status || 'activo',
-      date: transaction.date || new Date().toISOString().split('T')[0],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    };
-
-    // Remove client-side only aliases before insert
-    const { teacherName, ...dbPayload } = payload;
-    const columns = Object.keys(dbPayload).filter(key => dbPayload[key] !== undefined);
-
+    // INSERT EXPLÍCITO para evitar errores de mapeo dinámico
     const finalQuery = sql`
-      INSERT INTO transactions ${sql(dbPayload, ...columns)}
+      INSERT INTO transactions (
+        item_id, item_name, teacher_id, teacher_name, 
+        quantity, type, date, return_date, 
+        status, notes, course_name, created_at, updated_at
+      ) VALUES (
+        ${transaction.item_id}, ${transaction.item_name}, ${transaction.teacher_id || null}, ${transaction.teacher_name || 'Sin asignar'},
+        ${Number(transaction.quantity)}, ${transaction.type}, ${transaction.date}, ${transaction.return_date || null},
+        ${transaction.status || 'activo'}, ${transaction.notes || null}, ${transaction.course_name || null}, 
+        ${new Date().toISOString()}, ${new Date().toISOString()}
+      )
       RETURNING *
     `;
     
     const results = await finalQuery;
     
     if (!results || results.length === 0) {
-      console.error('❌ No data returned from INSERT');
-      return { success: false, error: 'La base de datos no devolvió el registro creado.' } as any;
+      return { success: false, error: 'No se recibió respuesta de Neon tras insertar.' } as any;
     }
 
     const data = results[0];
     const normalizedData = {
       ...data,
-      quantity: Number(data.quantity || 0),
-      teacherId: data.teacher_id,
+      quantity: Number(data.quantity),
+      teacherName: data.teacher_name,
       itemId: data.item_id,
-      itemName: data.item_name,
-      returnDate: data.return_date,
-      courseName: data.course_name,
-      teacherName: data.teacher_name || 'Sin asignar',
-      // Mantener snake_case para compatibilidad con DB
-      teacher_id: data.teacher_id,
-      item_id: data.item_id,
-      item_name: data.item_name,
-      return_date: data.return_date,
-      course_name: data.course_name
+      teacherId: data.teacher_id,
+      courseName: data.course_name
     };
-    console.log('✅ Transaction saved successfully:', data.id);
+    
     return { success: true, data: normalizedData } as any;
   } catch (error: any) {
-    console.error('❌ CRITICAL DATABASE ERROR adding transaction:', error.message || error);
-    return { 
-      success: false, 
-      error: error.message || 'Error desconocido en la base de datos',
-      detail: error.detail || error.hint || null
-    } as any;
+    console.error('DATABASE ERROR in addTransaction:', error);
+    return { success: false, error: error.message || 'Error desconocido' } as any;
   }
 };
 
