@@ -109,12 +109,14 @@ export interface Disposal {
   itemName?: string;
 }
 
-// App Settings
 export interface AppSettings {
   categories: string[];
   locations: string[];
   teachers: string[];
   sources: string[];
+  itemTypes: string[];
+  conditions: string[];
+  transactionTypes: string[];
   lowStockThreshold: number;
   defaultLoanDays: number;
   currency: string;

@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     return_date DATE,
     status TEXT NOT NULL, -- 'activo', 'completado', 'vencido'
     notes TEXT,
+    course_name TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

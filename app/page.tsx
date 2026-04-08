@@ -69,6 +69,13 @@ export interface AppSettings {
   conditions: string[]
   locations: string[]
   transactionTypes: string[]
+  teachers: string[]
+  sources: string[]
+  defaultLoanDays: number
+  currency: string
+  language: string
+  notifications: boolean
+  autoBackup: boolean
 }
 
 export default function Home() {
@@ -100,7 +107,14 @@ export default function Home() {
     itemTypes: [],
     conditions: [],
     locations: [],
-    transactionTypes: []
+    transactionTypes: [],
+    teachers: [],
+    sources: [],
+    defaultLoanDays: 7,
+    currency: 'ARS',
+    language: 'es',
+    notifications: true,
+    autoBackup: false
   });
 
   // Cargar transacciones desde la base de datos
@@ -397,7 +411,11 @@ export default function Home() {
                   <div className="flex justify-center p-4">Cargando herramientas...</div>
                 ) : (
                   <ToolsList
-                    items={items.filter(item => item.category === "Herramientas" || item.type === "herramienta")}
+                    items={items.filter(item => {
+                      const cat = item.category?.toLowerCase() || "";
+                      const type = item.type?.toLowerCase() || "";
+                      return cat.includes("herramienta") || type === "herramienta";
+                    })}
                     transactions={transactions}
                     settings={settings}
                     searchTerm={searchTerm}
@@ -429,7 +447,11 @@ export default function Home() {
                   <div className="flex justify-center p-4">Cargando insumos...</div>
                 ) : (
                   <SuppliesList
-                    items={items.filter(item => item.category === "Insumos" || item.type === "insumo")}
+                    items={items.filter(item => {
+                      const cat = item.category?.toLowerCase() || "";
+                      const type = item.type?.toLowerCase() || "";
+                      return cat.includes("insumo") || type === "insumo";
+                    })}
                     searchTerm={searchTerm}
                     onSearchChange={setSearchTerm}
                     transactions={transactions}

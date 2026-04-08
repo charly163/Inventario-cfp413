@@ -98,7 +98,10 @@ function getDefaultAppSettings(): AppSettings {
     categories: ['EQUIPAMIENTO', 'HERRAMIENTA', 'INSUMO', 'MOBILIARIO', 'OTROS', 'UTENSILIO DE COCINA'],
     sources: ['COMPRA', 'DONACION', 'TRASLADO', 'OTRO'],
     teachers: [],
-    locations: ['ALMACEN', 'AULA', 'OFICINA', 'TALLER']
+    locations: ['ALMACEN', 'AULA', 'OFICINA', 'TALLER'],
+    itemTypes: ['herramienta', 'insumo'],
+    conditions: ['nuevo', 'usado', 'regular', 'malo'],
+    transactionTypes: ['prestamo', 'devolucion', 'entrada', 'salida']
   };
 }
 
@@ -142,11 +145,11 @@ export const updateSettings = async (settings: AppSettings): Promise<boolean> =>
 export const getItems = async (): Promise<Item[]> => {
   try {
     const data = await sql`SELECT * FROM items ORDER BY name ASC`;
-    return Array.from(data).map(item => ({
+    return (data as any[]).map(item => ({
       ...item,
       cost: item.cost ? Number(item.cost) : null,
       quantity: item.quantity ? Number(item.quantity) : 0
-    })) as any;
+    })) as Item[];
   } catch (error) {
     console.error('Error getting items:', error);
     return [];
@@ -219,12 +222,12 @@ export const getTransactions = async (): Promise<Transaction[]> => {
       ORDER BY t.created_at DESC
     `;
 
-    return Array.from(data).map(tx => ({
+    return (data as any[]).map(tx => ({
       ...tx,
       quantity: Number(tx.quantity),
       teacherName: tx.first_name ? `${tx.first_name} ${tx.last_name}` : tx.teacher_name,
       teacher_id: tx.teacher_id || undefined
-    })) as any;
+    })) as Transaction[];
   } catch (error) {
     console.error('Error getting transactions:', error);
     return [];
@@ -260,6 +263,14 @@ export const addTransaction = async (transaction: any): Promise<Transaction | nu
 export const checkConnection = async (): Promise<boolean> => {
   try {
     await sql`SELECT 1`;
+    
+    // Migración rápida: asegurar que existan las columnas nuevas en producción
+    try {
+      await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS course_name TEXT`;
+    } catch (e) {
+      console.log("Columna course_name ya existe o error al crearla (ignorable)");
+    }
+
     return true;
   } catch (error) {
     console.error('Error checking database connection:', error);
