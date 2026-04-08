@@ -254,13 +254,23 @@ export const addTransaction = async (transaction: any): Promise<Transaction | nu
       RETURNING *
     `;
     
-    const [data] = await finalQuery;
+    const results = await finalQuery;
+    
+    if (!results || results.length === 0) {
+      console.error('❌ No data returned from INSERT');
+      return { success: false, error: 'La base de datos no devolvió el registro creado.' } as any;
+    }
+
+    const data = results[0];
     console.log('✅ Transaction saved successfully:', data.id);
-    return data as any;
-  } catch (error) {
-    console.error('❌ CRITICAL DATABASE ERROR adding transaction:');
-    console.error(JSON.stringify(error, null, 2));
-    throw error;
+    return { success: true, data: data } as any;
+  } catch (error: any) {
+    console.error('❌ CRITICAL DATABASE ERROR adding transaction:', error.message || error);
+    return { 
+      success: false, 
+      error: error.message || 'Error desconocido en la base de datos',
+      detail: error.detail || error.hint || null
+    } as any;
   }
 };
 

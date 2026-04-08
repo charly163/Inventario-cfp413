@@ -184,15 +184,19 @@ export default function Home() {
 
   const handleAddTransaction = async (transaction: Omit<Transaction, 'id' | 'created_at' | 'updated_at'>) => {
     try {
-      const newTransaction = await createTransactionInDb(transaction);
-      if (newTransaction) {
-        setTransactions([newTransaction, ...transactions]);
+      const response = await createTransactionInDb(transaction) as any;
+      
+      if (response && response.success) {
+        setTransactions([response.data, ...transactions]);
         toast.success("Transacción agregada correctamente");
+      } else {
+        const errorMsg = response?.error || "Error desconocido";
+        toast.error(`No se pudo guardar: ${errorMsg}`);
+        console.error("Database error:", response);
       }
     } catch (error) {
-      console.error("Error adding transaction:", error);
-      toast.error(`Error de base de datos: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-      throw error;
+      console.error("Network/Server error adding transaction:", error);
+      toast.error("Error crítico de comunicación con el servidor");
     }
   }
 
