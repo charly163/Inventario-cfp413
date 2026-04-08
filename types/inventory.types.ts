@@ -70,10 +70,10 @@ export type TransactionStatus = 'activo' | 'completado' | 'vencido';
 
 export interface Transaction {
   id: string;
-  item_id: string;
+  item_id: string | null;
   item_name: string;
-  teacher_id: string;  // Added teacher_id field
-  teacher_name: string;
+  teacher_id: string | null;
+  teacher_name: string | null;
   quantity: number;
   type: 'prestamo' | 'devolucion' | 'entrada' | 'salida';
   date: string;
