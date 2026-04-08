@@ -214,6 +214,13 @@ export const updateItem = async (id: string, updates: any): Promise<boolean> => 
 
 export const getTransactions = async (): Promise<Transaction[]> => {
   try {
+    // Asegurar que la columna course_name existe (migración automática)
+    try {
+      await sql`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS course_name TEXT`;
+    } catch (e) {
+      // Ignorar error si ya existe
+    }
+
     const data = await sql`
       SELECT t.*, 
              tr.first_name, tr.last_name
