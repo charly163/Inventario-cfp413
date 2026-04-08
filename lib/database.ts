@@ -224,9 +224,18 @@ export const getTransactions = async (): Promise<Transaction[]> => {
 
     return (data as any[]).map(tx => ({
       ...tx,
-      quantity: Number(tx.quantity),
-      teacherName: tx.first_name ? `${tx.first_name} ${tx.last_name}` : tx.teacher_name,
-      teacher_id: tx.teacher_id || undefined
+      quantity: Number(tx.quantity || 0),
+      teacherName: tx.first_name ? `${tx.first_name} ${tx.last_name}` : (tx.teacher_name || tx.teacherName || 'Sin asignar'),
+      teacherId: tx.teacher_id || tx.teacherId,
+      itemId: tx.item_id || tx.itemId,
+      itemName: tx.item_name || tx.itemName,
+      returnDate: tx.return_date || tx.returnDate,
+      courseName: tx.course_name || tx.courseName,
+      teacher_id: tx.teacher_id,
+      item_id: tx.item_id,
+      item_name: tx.item_name,
+      return_date: tx.return_date,
+      course_name: tx.course_name
     })) as Transaction[];
   } catch (error) {
     console.error('Error getting transactions:', error);
@@ -262,8 +271,24 @@ export const addTransaction = async (transaction: any): Promise<Transaction | nu
     }
 
     const data = results[0];
+    const normalizedData = {
+      ...data,
+      quantity: Number(data.quantity || 0),
+      teacherId: data.teacher_id,
+      itemId: data.item_id,
+      itemName: data.item_name,
+      returnDate: data.return_date,
+      courseName: data.course_name,
+      teacherName: data.teacher_name || 'Sin asignar',
+      // Mantener snake_case para compatibilidad con DB
+      teacher_id: data.teacher_id,
+      item_id: data.item_id,
+      item_name: data.item_name,
+      return_date: data.return_date,
+      course_name: data.course_name
+    };
     console.log('✅ Transaction saved successfully:', data.id);
-    return { success: true, data: data } as any;
+    return { success: true, data: normalizedData } as any;
   } catch (error: any) {
     console.error('❌ CRITICAL DATABASE ERROR adding transaction:', error.message || error);
     return { 

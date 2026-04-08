@@ -219,11 +219,17 @@ export default function TransactionsList({
       {/* Lista de transacciones */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5" />
-            Transacciones ({filteredTransactions.length})
-          </CardTitle>
-          <CardDescription>Historial de préstamos y donaciones</CardDescription>
+          <div className="flex justify-between items-center">
+            <div>
+              <CardTitle>Historial de Transacciones</CardTitle>
+              <CardDescription>
+                Listado completo de movimientos (Préstamos, Donaciones, etc.)
+              </CardDescription>
+            </div>
+            <div className="text-sm bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-200">
+              {filteredTransactions.length} visibles de {transactions.length} totales
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Búsqueda y Filtros */}
