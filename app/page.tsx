@@ -374,12 +374,12 @@ export default function Home() {
         </div>
 
         <Tabs defaultValue="inventario" value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="herramientas">Herramientas</TabsTrigger>
-            <TabsTrigger value="insumos">Insumos</TabsTrigger>
-            <TabsTrigger value="prestamos">Préstamos</TabsTrigger>
-            <TabsTrigger value="inventario">Todos</TabsTrigger>
-            <TabsTrigger value="config">Config</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 h-auto gap-1 md:gap-0">
+            <TabsTrigger value="herramientas" className="py-2">Herramientas</TabsTrigger>
+            <TabsTrigger value="insumos" className="py-2">Insumos</TabsTrigger>
+            <TabsTrigger value="prestamos" className="py-2">Préstamos</TabsTrigger>
+            <TabsTrigger value="inventario" className="py-2">Todos</TabsTrigger>
+            <TabsTrigger value="config" className="py-2">Config</TabsTrigger>
           </TabsList>
 
           <TabsContent value="herramientas">

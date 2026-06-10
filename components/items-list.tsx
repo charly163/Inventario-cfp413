@@ -417,8 +417,8 @@ export default function ItemsList({
           </div>
 
           {/* Tabla */}
-          <div className="rounded-md border">
-            <Table>
+          <div className="rounded-md border overflow-x-auto w-full">
+            <Table className="min-w-[800px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>
