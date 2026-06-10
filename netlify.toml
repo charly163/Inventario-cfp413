@@ -1,31 +1,6 @@
 [build]
-  command = "npm ci --include=dev && npm run build"
+  command = "npm run build"
   publish = ".next"
-  functions = ".netlify/functions"
 
-[build.environment]
-  NODE_VERSION = "20"
-  NODE_ENV = "production"
-  NEXT_TELEMETRY_DISABLED = "1"
-  NODE_OPTIONS = "--max_old_space_size=4096"
-
-# Next.js Runtime manejará las rutas automáticamente
-
-# Configuración de encabezados
-[[headers]]
-  for = "/*"
-  [headers.values]
-    Cache-Control = "no-cache, no-store, must-revalidate, max-age=0, s-maxage=0"
-    Pragma = "no-cache"
-    Expires = "0"
-    X-Content-Type-Options = "nosniff"
-    X-Frame-Options = "DENY"
-    X-XSS-Protection = "1; mode=block"
-    Referrer-Policy = "strict-origin-when-cross-origin"
-    Last-Modified = "Wed, 25 Sep 2025 12:00:00 GMT"
-
-# Configuración para desarrollo local
-[dev]
-  command = "npm run dev"
-  port = 3000
-  publish = ".next"
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

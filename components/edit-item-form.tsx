@@ -34,7 +34,7 @@ export default function EditItemForm({ item, onUpdateItem, onClose, lowStockThre
   const [description, setDescription] = useState(item.description || "")
   const [type, setType] = useState<"herramienta" | "insumo">(item.type)
   const [brand, setBrand] = useState(item.brand || "")
-  const [condition, setCondition] = useState<"nuevo" | "usado" | "regular" | "malo" | string>(item.condition || "nuevo")
+  const [condition, setCondition] = useState<string>(item.condition || "nuevo");
   const [location, setLocation] = useState(item.location || "")
   const [source, setSource] = useState((item as any).source || "")
   const [acquisitionDate, setAcquisitionDate] = useState<string>(() => {
