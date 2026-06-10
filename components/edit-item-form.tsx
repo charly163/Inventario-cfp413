@@ -37,8 +37,16 @@ export default function EditItemForm({ item, onUpdateItem, onClose, lowStockThre
   const [condition, setCondition] = useState<"nuevo" | "usado" | "regular" | "malo" | string>(item.condition || "nuevo")
   const [location, setLocation] = useState(item.location || "")
   const [source, setSource] = useState((item as any).source || "")
-  const [acquisitionDate, setAcquisitionDate] = useState<string>((item as any).acquisition_date || "")
+  const [acquisitionDate, setAcquisitionDate] = useState<string>(() => {
+    const val = (item as any).acquisition_date;
+    if (!val) return "";
+    if (typeof val === "string") return val.split('T')[0];
+    if (val instanceof Date) return val.toISOString().split('T')[0];
+    return "";
+  });
   const [imageUrl, setImageUrl] = useState((item as any).image_url || (item as any).image || "")
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>((item as any).image_url || (item as any).image || "")
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState<any[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
@@ -60,6 +68,18 @@ export default function EditItemForm({ item, onUpdateItem, onClose, lowStockThre
     };
     fetchData();
   }, []);
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setImageFile(file)
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -110,6 +130,33 @@ export default function EditItemForm({ item, onUpdateItem, onClose, lowStockThre
         status = "low-stock"
       }
 
+      let finalImageUrl = imageUrl
+
+      if (imageFile) {
+        try {
+          const uploadData = new FormData();
+          uploadData.append("image", imageFile);
+
+          const uploadRes = await fetch("/api/upload", {
+            method: "POST",
+            body: uploadData,
+          });
+
+          if (!uploadRes.ok) {
+            const errData = await uploadRes.json();
+            throw new Error(errData.error || "Fallo al subir la imagen");
+          }
+
+          const uploadResult = await uploadRes.json();
+          finalImageUrl = uploadResult.url;
+        } catch (uploadError: any) {
+          console.error("Error al subir la imagen:", uploadError);
+          toast.error("Error de imagen", {
+            description: `No se pudo subir la nueva imagen: ${uploadError.message || "Error desconocido"}. Se conservará la imagen anterior.`,
+          });
+        }
+      }
+
       const updatedItem: Partial<Item> = {
         name: name.trim(),
         category,
@@ -123,7 +170,7 @@ export default function EditItemForm({ item, onUpdateItem, onClose, lowStockThre
         location: location.trim() || undefined,
         source: source || undefined,
         acquisition_date: acquisitionDate || undefined,
-        image: imageUrl || undefined,
+        image: finalImageUrl || undefined,
       }
 
       await onUpdateItem(item.id, updatedItem)
@@ -300,9 +347,38 @@ export default function EditItemForm({ item, onUpdateItem, onClose, lowStockThre
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="image">Imagen (URL)</Label>
-              <Input id="image" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} placeholder="https://..."/>
+            <div className="space-y-2">
+              <Label htmlFor="image">Imagen</Label>
+              <Input
+                id="image"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleImageChange}
+                className="cursor-pointer"
+              />
+              {imagePreview && (
+                <div className="mt-2 flex items-center gap-2">
+                  <img
+                    src={imagePreview}
+                    alt="Vista previa"
+                    className="h-20 w-20 object-cover rounded border"
+                  />
+                  {imageFile && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setImageFile(null);
+                        setImagePreview((item as any).image_url || (item as any).image || "");
+                      }}
+                    >
+                      Deshacer cambios
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 

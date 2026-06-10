@@ -137,10 +137,29 @@ export function AddItemForm({ onAddItem, defaultType }: AddItemFormProps) {
 
       let imageUrl = null
 
-      // TODO: Implementar almacenamiento para Neon/Netlify (Cloudinary, AWS S3, etc.)
       if (image) {
-        console.warn("La subida de imágenes no está disponible actualmente en Neon. Se requiere un proveedor de almacenamiento externo.");
-        toast.info("Aviso", { description: "La subida de imágenes estará disponible pronto. El item se creará sin imagen." });
+        try {
+          const uploadData = new FormData();
+          uploadData.append("image", image);
+
+          const uploadRes = await fetch("/api/upload", {
+            method: "POST",
+            body: uploadData,
+          });
+
+          if (!uploadRes.ok) {
+            const errData = await uploadRes.json();
+            throw new Error(errData.error || "Fallo al subir la imagen");
+          }
+
+          const uploadResult = await uploadRes.json();
+          imageUrl = uploadResult.url;
+        } catch (uploadError: any) {
+          console.error("Error al subir la imagen:", uploadError);
+          toast.error("Error de imagen", {
+            description: `No se pudo subir la imagen: ${uploadError.message || "Error desconocido"}. El artículo se creará sin imagen.`,
+          });
+        }
       }
 
       const newItem: Omit<Item, 'id' | 'created_at' | 'updated_at'> = {
@@ -337,6 +356,7 @@ export function AddItemForm({ onAddItem, defaultType }: AddItemFormProps) {
                 id="image"
                 type="file"
                 accept="image/*"
+                capture="environment"
                 onChange={handleImageChange}
                 className="cursor-pointer"
               />
