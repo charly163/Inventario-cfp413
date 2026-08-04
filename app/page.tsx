@@ -24,7 +24,8 @@ import {
   getConditions,
   deleteItem as deleteItemInDb,
   getSettings,
-  updateSettings
+  updateSettings,
+  processReturn
 } from "@/lib/database"
 
 // Alias para mantener la compatibilidad con el código existente
@@ -272,15 +273,20 @@ export default function Home() {
     return 0;
   };
 
-  const handleMarkReturned = async (transactionId: string) => {
-    // Simulamos marcar una transacción como devuelta
-    setTransactions(transactions.map(t => {
-      if (t.id === transactionId) {
-        return { ...t, status: "completado" }
+  const handleMarkReturned = async (transactionId: string, quantity: number) => {
+    try {
+      const result = await processReturn(transactionId, quantity);
+      if (result.success) {
+        // Refrescar las transacciones desde la base de datos
+        await loadTransactions();
+        toast.success("Préstamo devuelto correctamente");
+      } else {
+        toast.error(`Error: ${result.error || 'No se pudo procesar la devolución'}`);
       }
-      return t
-    }))
-    toast.success("Préstamo marcado como devuelto")
+    } catch (error) {
+      console.error('Error in handleMarkReturned:', error);
+      toast.error("Error al procesar la devolución");
+    }
     return Promise.resolve()
   }
 

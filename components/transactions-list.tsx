@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Search, CheckCircle, Clock, AlertTriangle, CalendarIcon, User, Package, Edit, Filter, Trash2, FileText } from "lucide-react"
 import { format, parseISO, isAfter } from "date-fns"
 import { es } from "date-fns/locale"
@@ -28,7 +29,7 @@ const parseDateSafe = (dateStr: any) => {
 
 interface TransactionsListProps {
   transactions: Transaction[]
-  onMarkReturned: (transactionId: string) => Promise<void>
+  onMarkReturned: (transactionId: string, quantity: number) => Promise<void>
   onExtendLoan: (transactionId: string, newReturnDate: string) => Promise<void>
   onUpdateReturnDate: (transactionId: string, newReturnDate: string) => Promise<void>
   onViewDetails?: (transaction: Transaction) => void
@@ -48,6 +49,10 @@ export default function TransactionsList({
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [editingReturnDate, setEditingReturnDate] = useState<string | null>(null)
   const [newReturnDate, setNewReturnDate] = useState<Date>()
+  
+  // Estado para devolución parcial
+  const [returningTransaction, setReturningTransaction] = useState<Transaction | null>(null)
+  const [returnQuantity, setReturnQuantity] = useState<number>(1)
 
   // Filtrar transacciones
   const filteredTransactions = useMemo(() => {
@@ -415,7 +420,14 @@ export default function TransactionsList({
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => onMarkReturned(transaction.id)}
+                              onClick={() => {
+                                if (transaction.quantity > 1) {
+                                  setReturningTransaction(transaction)
+                                  setReturnQuantity(transaction.quantity)
+                                } else {
+                                  onMarkReturned(transaction.id, 1)
+                                }
+                              }}
                               className="gap-1"
                             >
                               <CheckCircle className="h-3 w-3" />
@@ -466,6 +478,49 @@ export default function TransactionsList({
           )}
         </CardContent>
       </Card>
+
+      {/* Diálogo de devolución parcial */}
+      <Dialog open={!!returningTransaction} onOpenChange={(open) => !open && setReturningTransaction(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Devolver artículos</DialogTitle>
+            <DialogDescription>
+              ¿Cuántos artículos deseas devolver de este préstamo?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium mb-1 block">
+                  Cantidad a devolver (Máximo: {returningTransaction?.quantity})
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={returningTransaction?.quantity}
+                  value={returnQuantity}
+                  onChange={(e) => setReturnQuantity(Number(e.target.value))}
+                />
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <Button variant="outline" onClick={() => setReturningTransaction(null)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (returningTransaction) {
+                  onMarkReturned(returningTransaction.id, returnQuantity)
+                  setReturningTransaction(null)
+                }
+              }}
+            >
+              Confirmar devolución
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

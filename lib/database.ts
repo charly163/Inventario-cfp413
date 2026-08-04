@@ -508,3 +508,52 @@ export const deleteCondition = async (id: string) => {
     return false;
   }
 };
+
+export const processReturn = async (transactionId: string, returnedQuantity: number): Promise<{ success: boolean; data?: any; error?: string }> => {
+  try {
+    const txs = await sql`SELECT * FROM transactions WHERE id = ${transactionId}`;
+    if (!txs || txs.length === 0) {
+      return { success: false, error: 'Transacción no encontrada' };
+    }
+    
+    const tx = txs[0];
+    const originalQuantity = Number(tx.quantity);
+    
+    if (returnedQuantity >= originalQuantity) {
+      const [updated] = await sql`
+        UPDATE transactions 
+        SET status = 'completado', updated_at = NOW() 
+        WHERE id = ${transactionId}
+        RETURNING *
+      `;
+      return { success: true, data: updated };
+    } else {
+      const remainingQuantity = originalQuantity - returnedQuantity;
+      
+      await sql`
+        UPDATE transactions 
+        SET quantity = ${remainingQuantity}, updated_at = NOW() 
+        WHERE id = ${transactionId}
+      `;
+      
+      const [newTx] = await sql`
+        INSERT INTO transactions (
+          item_id, item_name, teacher_id, teacher_name, 
+          quantity, type, date, return_date, 
+          status, notes, course_name, created_at, updated_at
+        ) VALUES (
+          ${tx.item_id}, ${tx.item_name}, ${tx.teacher_id}, ${tx.teacher_name},
+          ${returnedQuantity}, ${tx.type}, ${tx.date}, ${tx.return_date},
+          'completado', ${tx.notes ? tx.notes + ' (Devolución parcial)' : 'Devolución parcial'}, ${tx.course_name}, 
+          NOW(), NOW()
+        )
+        RETURNING *
+      `;
+      
+      return { success: true, data: newTx };
+    }
+  } catch (error: any) {
+    console.error('Error processing return:', error);
+    return { success: false, error: error.message || 'Error al procesar devolución' };
+  }
+};
