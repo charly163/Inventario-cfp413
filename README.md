@@ -34,9 +34,8 @@ Sistema de inventario para herramientas e insumos del CFP 413, con gestión de p
 
 - **Frontend**: Next.js 14, React 18, TypeScript
 - **UI**: Tailwind CSS, Radix UI Components
-- **Base de Datos**: Supabase (PostgreSQL)
-- **Despliegue**: Vercel
-- **Autenticación**: Supabase Auth
+- **Base de Datos**: Neon (PostgreSQL)
+- **Despliegue**: Netlify
 
 ## 📦 Instalación
 
@@ -51,35 +50,32 @@ npm install
 
 # Configurar variables de entorno
 cp .env.example .env.local
-# Editar .env.local con tus credenciales de Supabase
+# Editar .env.local con tu DATABASE_URL de Neon
 
 # Ejecutar servidor de desarrollo
 npm run dev
 \`\`\`
 
 ### Configuración de Base de Datos
-1. Crear proyecto en [Supabase](https://supabase.com)
-2. Ejecutar scripts SQL en `/scripts/`
-3. Configurar variables de entorno
-4. Ejecutar migraciones
+1. Configurar la base de datos en [Neon](https://neon.tech) (o vía la extensión de Netlify)
+2. Ejecutar scripts SQL en `/scripts/neon_schema.sql`
+3. Configurar variable de entorno `DATABASE_URL`
 
 ## 🚀 Despliegue
 
-### Vercel (Recomendado)
-1. Conectar repositorio a Vercel
-2. Configurar variables de entorno
+### Netlify (Recomendado)
+1. Conectar repositorio a Netlify
+2. Configurar extensión de Neon o variables de entorno
 3. Deploy automático desde rama `main`
 
 ### Variables de Entorno Requeridas
-\`\`\`env
-NEXT_PUBLIC_SUPABASE_URL=tu_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=tu_service_role_key
-\`\`\`
+```env
+DATABASE_URL=tu_neon_database_url
+```
 
 ## 📊 Estructura del Proyecto
 
-\`\`\`
+```
 ├── app/                    # App Router de Next.js
 │   ├── layout.tsx         # Layout principal
 │   ├── page.tsx           # Página principal
@@ -92,8 +88,8 @@ SUPABASE_SERVICE_ROLE_KEY=tu_service_role_key
 │   ├── supplies-list.tsx # Lista de insumos
 │   └── ...               # Otros componentes
 ├── lib/                  # Utilidades y configuración
-│   ├── database.ts       # Funciones de base de datos
-│   ├── supabase.ts       # Cliente Supabase
+│   ├── database.ts       # Funciones de base de datos (Neon)
+│   ├── db.ts             # Cliente de conexión SQL
 │   └── utils.ts          # Utilidades generales
 ├── scripts/              # Scripts SQL
 │   ├── create-tables.sql # Creación de tablas
@@ -143,8 +139,7 @@ El sistema está completamente optimizado para:
 
 ## 🔒 Seguridad
 
-- Autenticación mediante Supabase Auth
-- Row Level Security (RLS) en base de datos
+- Base de datos segura serverless con Neon
 - Validación de datos en frontend y backend
 - Logs de auditoría para todas las operaciones
 
@@ -155,7 +150,7 @@ El sistema está completamente optimizado para:
 - ✅ Préstamos múltiples con selección de herramientas
 - ✅ Historial completo de transacciones
 - ✅ Configuración dinámica de parámetros
-- ✅ Integración completa con Supabase
+- ✅ Integración completa con Neon (PostgreSQL)
 - ✅ Interfaz responsive y moderna
 
 ### Próximas Funcionalidades
